@@ -11,13 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('point_stock_summaries', function (Blueprint $table) {
+        Schema::create('visits', function (Blueprint $table) {
             $table->id();
             
-            $table->foreignId('sales_points_id')->constrained();
-            $table->int('total_loaded_qty');
-            $table->bigInteger('total_loaded_amount');
-            $table->int('current_stock');
+            $table->foreignId('market_id')->constrained()->cascadeOnDelete();
+            $table->date('visit_date');
+            $table->integer('previous_stock');
+            $table->integer('sold_qty');
+            $table->integer('minus_qty');
+            $table->integer('total_amount');
+            $table->text('comment')->nullable();
             
             $table->timestamps();
         });
@@ -28,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('point_stock_summaries');
+        Schema::dropIfExists('visits');
     }
 };

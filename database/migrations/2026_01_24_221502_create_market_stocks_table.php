@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('visit_images', function (Blueprint $table) {
+        Schema::create('market_stocks', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('visits_id')->constrained();
-            $table->string('image');
-
+            $table->foreignId('market_id')->constrained()->cascadeOnDelete();
+            $table->integer('total_loaded_qty');
+            $table->bigInteger('total_loaded_amount');
+            $table->integer('current_stock');
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('visit_images');
+        Schema::dropIfExists('market_stocks');
     }
 };

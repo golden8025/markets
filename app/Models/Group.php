@@ -9,6 +9,6 @@ class Group extends Model
     protected $fillable = ['name'];
 
     public function markets(){
-        return $this->hasMany(SalesPoints::class);
+        return $this->hasMany(Market::class);
     }
 }

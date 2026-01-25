@@ -11,16 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sales_points', function (Blueprint $table) {
+        Schema::create('products', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('groups_id')->constrained();
+            
             $table->string('name');
-            $table->string('key')->nullable();
-            $table->enum('type', ['metan', 'propan', 'dokon']);
-            $table->decimal('latitude', 10, 8);
-            $table->decimal('longitude', 11, 8);
-
+            $table->bigInteger('price');
+            
             $table->timestamps();
         });
     }
@@ -30,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sales_points');
+        Schema::dropIfExists('products');
     }
 };

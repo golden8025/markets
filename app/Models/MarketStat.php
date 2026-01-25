@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class SalePointStats extends Model
+class MarketStat extends Model
 {
-    protected $table = 'view_sales_point_stats';
+    protected $table = 'view_market_stats';
     public $timestamps = false;
     protected $guarded = [];
 }
