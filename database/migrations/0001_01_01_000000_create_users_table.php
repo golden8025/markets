@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('login')->unique();
             $table->timestamp('login_verified_at')->nullable();
+            $table->enum('role', ['admin', 'agent'])->default('agent');
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
