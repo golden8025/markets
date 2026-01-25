@@ -53,4 +53,14 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Market::class, 'market_user');
     }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isAgent(): bool
+    {
+        return $this->role === 'agent';
+    }
 }
