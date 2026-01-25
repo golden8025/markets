@@ -4,9 +4,9 @@ namespace App\Traits;
 
 trait ApiResponses
 {
-    protected function ok($message, $data = [])
+    protected function ok($message)
     {
-        return $this->success($message, $data, 200);
+        return $this->success($message, 200);
     }
 
   

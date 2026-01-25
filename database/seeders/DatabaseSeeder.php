@@ -18,8 +18,8 @@ class DatabaseSeeder extends Seeder
         // User::factory(1)->create();
 
         User::factory()->create([
-            'name' => 'Test User',
-            'login' => 'admin',
+            'name' => 'Agent User',
+            'login' => 'agent1',
         ]);
     }
 }
