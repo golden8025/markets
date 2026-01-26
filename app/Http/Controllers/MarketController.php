@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\MarketResource;
+use App\Models\Market;
 use Illuminate\Http\Request;
+use App\Traits\ApiResponses;
 
 class MarketController extends Controller
 {
+    use ApiResponses;
     /**
      * Display a listing of the resource.
      */
     public function index()
     {
-        
+        return MarketResource::collection(Market::all());
     }
 
     /**

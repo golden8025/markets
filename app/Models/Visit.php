@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Visit extends Model
 {
+    use HasFactory;
     protected $fillable = [
         
-        'sales_point_id',
+        'market_id',
         'visit_date',
         'previous_stock',
         'sold_qty',
