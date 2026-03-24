@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('markets', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('group_id')->constrained()->nullable()->nullOnDelete();
+            $table->foreignId('group_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name')->unique();
             $table->string('key')->nullable();
             $table->enum('type', ['metan', 'propan', 'dokon']);
