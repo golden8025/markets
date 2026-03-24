@@ -15,9 +15,17 @@ class Product extends Model
     ];
 
 
-    public function market()
+    // public function market()
+    // {
+    //     return $this->hasMany(Market::class, 'product_stock');
+    // }
+    public function markets()
     {
-        return $this->hasMany(Market::class, 'product_stock');
+        return $this->belongsToMany(Market::class, 'product_stocks')
+                    ->withPivot('qty');
     }
-    
+
+    public function stocks() {
+        return $this->hasMany(ProductStock::class);
+    }
 }

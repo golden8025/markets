@@ -28,7 +28,13 @@ class AuthController extends Controller
 
         $token = $user->createToken($tokenName, ['*'], now()->addMonths(5))->plainTextToken;
 
-        return $this->success('Authenticated', ['token' => $token]);
+        return response()->json([
+            'message' => 'Authenticated',
+            'token' => $token,
+            'role' => $user->role
+            
+        ], 200);
+        // return $this->success('Authenticated', ['token' => $token]);
         
         
     }

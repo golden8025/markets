@@ -6,21 +6,18 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    
     /**
      * Run the migrations.
      */
-
     public function up(): void
     {
-        Schema::create('visits', function (Blueprint $table) {
+        Schema::create('visit_infos', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('market_id')->constrained()->cascadeOnDelete();
-            // $table->integer('profit');
-            $table->text('comment')->nullable();
-            
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('visit_id')->constrained()->cascadeOnDelete();
+            $table->integer('loaded');
+            $table->integer('left');
+            $table->integer('profit');
             $table->timestamps();
         });
     }
@@ -30,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('visits');
+        Schema::dropIfExists('visit_infos');
     }
 };

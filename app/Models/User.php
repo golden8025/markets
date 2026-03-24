@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'login',
         'password',
+        'permission',
         'role',
     ];
 
@@ -44,14 +45,14 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
+            'permission',
             'password' => 'hashed',
         ];
     }
 
     public function markets(): BelongsToMany
     {
-        return $this->belongsToMany(Market::class, 'market_user');
+        return $this->belongsToMany(Market::class, 'market_users');
     }
 
     public function isAdmin(): bool
@@ -62,5 +63,10 @@ class User extends Authenticatable
     public function isAgent(): bool
     {
         return $this->role === 'agent';
+    }
+
+    public function visits()
+    {
+        return $this->hasMany(Visit::class);
     }
 }

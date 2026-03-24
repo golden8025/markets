@@ -10,17 +10,26 @@ class Visit extends Model
     use HasFactory;
     protected $fillable = [
         
+        'user_id',
         'market_id',
-        'visit_date',
-        'previous_stock',
-        'sold_qty',
-        'minus_qty',
-        'total_amount',
         'comment',
+        
 
     ];
     
     public function images(){
         return $this->hasMany(VisitImage::class);
+    }
+
+    public function user(){
+        return $this->belongsTo(User::class);
+    }
+
+    public function info() {
+        return $this->hasMany(VisitInfo::class);
+    }
+
+    public function market() {
+        return $this->belongsTo(Market::class);
     }
 }

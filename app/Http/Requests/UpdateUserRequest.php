@@ -3,8 +3,9 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class CreateAgent extends FormRequest
+class UpdateUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,7 +23,11 @@ class CreateAgent extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'name' => ['sometimes','string','max:255'],
+            'login' => ['sometimes', 'string', Rule::unique('users', 'login')->ignore($this->user)],
+            // 'role'      => ['sometimes', 'string', Rule::in(['agent', 'admin'])],
+            'permission' => ['sometimes', 'boolean'],
+            'password' => ['sometimes', "nullable", 'string', 'min:6']
         ];
     }
 }

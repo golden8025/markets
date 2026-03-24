@@ -19,7 +19,7 @@ class MarketFactory extends Factory
     {
         return [
             'group_id' => Group::factory(),
-            'name' => $this->faker->streetName,
+            'name' => $this->faker->name(),
             'key' => $this->faker->unique()->slug,
             'type' => $this->faker->randomElement(['metan', 'propan', 'dokon']),
             'latitude' => $this->faker->latitude,

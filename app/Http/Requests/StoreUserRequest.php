@@ -3,8 +3,9 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-class CreateMarket extends FormRequest
+class StoreUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -22,7 +23,17 @@ class CreateMarket extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'name' => ['required','string','max:255'],
+            'login' => ['required', 'string', 'unique:users,login'],
+            'permission' => ['required', 'boolean'],
+            'password' => ['required', 'min:6']
         ];
     }
+
+    // public function messages(): array
+    // {
+    //     return [
+    //         'login.unique' => 'Bunday login mavjud.',
+    //     ];
+    // }
 }

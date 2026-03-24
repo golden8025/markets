@@ -9,6 +9,7 @@ trait ApiResponses
         return $this->success($message, 200);
     }
 
+    
   
 
     protected function success(string $message, $data)

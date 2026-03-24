@@ -14,11 +14,19 @@ class ProductStock extends Model
         'qty',
     ];
 
-    public function product(){
+    // public function product(){
+    //     return $this->belongsTo(Product::class);
+    // }
+
+    // public function market(){
+    //     return $this->belongsTo(Market::class);
+    // }
+
+    public function product() {
         return $this->belongsTo(Product::class);
     }
 
-    public function market(){
+    public function market() {
         return $this->belongsTo(Market::class);
     }
 }

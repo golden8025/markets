@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Market extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'group_id',
         'name',
@@ -17,20 +18,34 @@ class Market extends Model
         'longitude',
     ];
 
+    // protected $casts = ['type'];
     public function group(){
         return $this->belongsTo(Group::class);
     }
 
 
-    public function stock(){
+    // public function stock(){
+    //     return $this->hasMany(ProductStock::class);
+    // }
+
+    // public function products(){
+    //     return $this->hasMany(Product::class, 'product_stock');
+    // }
+
+    public function products()
+    {
+        // Указываем промежуточную таблицу 'product_stocks'
+        // и можем подтянуть дополнительные поля, например 'qty'
+        return $this->belongsToMany(Product::class, 'product_stocks')
+                    ->withPivot('qty');
+    }
+
+    public function stocks() // Это связь "Один-ко-многим" к записям в таблице остатков
+    {
         return $this->hasMany(ProductStock::class);
     }
 
-    public function products(){
-        return $this->hasMany(Product::class, 'product_stock');
-    }
-
     public function users(){
-        return $this->hasMany(User::class, 'market_user');
+        return $this->belongsToMany(User::class, 'market_users');
     }
 }
