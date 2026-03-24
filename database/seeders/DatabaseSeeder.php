@@ -23,71 +23,71 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(1)->create();
 
-        $user1 = User::factory()->create([
-            'name' => 'Agent User',
-            'login' => 'agent',
-            'role' => 'agent',
-        ]);
+        // $user1 = User::factory()->create([
+        //     'name' => 'Javohir',
+        //     'login' => 'admin',
+        //     'role' => 'admin',
+        // ]);
 
-        $user2 = User::factory()->create([
-            'name' => 'admin User',
-            'login' => 'admin',
-            'role' => 'admin',
-        ]);
+        // $user2 = User::factory()->create([
+        //     'name' => 'admin User',
+        //     'login' => 'admin',
+        //     'role' => 'admin',
+        // ]);
 
         
-        $group = Group::create(['name' => 'Gurux 1']);
+        // $group = Group::create(['name' => 'Gurux 1']);
 
 
-        // 3. Создаем продукты
-        $product1 = Product::create(['name' => 'Coca-cola 0.5', 'price' => 50.00]);
-        $product2 = Product::create(['name' => 'pepsi 0.5', 'price' => 45.00]);
-        $product3 = Product::create(['name' => 'Chips Lays', 'price' => 120.00]);
+        // // 3. Создаем продукты
+        // $product1 = Product::create(['name' => 'Coca-cola 0.5', 'price' => 50.00]);
+        // $product2 = Product::create(['name' => 'pepsi 0.5', 'price' => 45.00]);
+        // $product3 = Product::create(['name' => 'Chips Lays', 'price' => 120.00]);
 
-        // 4. Создаем маркеты
-        $market1 = Market::create([
-            'group_id' => $group->id,
-            'name' => 'Market1',
-            'key' => 'm_center_01',
-            'type' => 'metan',
-            'latitude' => 41.2995,
-            'longitude' => 69.2401,
-        ]);
+        // // 4. Создаем маркеты
+        // $market1 = Market::create([
+        //     'group_id' => $group->id,
+        //     'name' => 'Market1',
+        //     'key' => 'm_center_01',
+        //     'type' => 'metan',
+        //     'latitude' => 41.2995,
+        //     'longitude' => 69.2401,
+        // ]);
 
-        $market2 = Market::create([
-            'group_id' => $group->id,
-            'name' => 'Market 2',
-            'key' => 'm_suburb_02',
-            'type' => 'propan',
-            'latitude' => 41.3111,
-            'longitude' => 69.2797,
-        ]);
+        // $market2 = Market::create([
+        //     'group_id' => $group->id,
+        //     'name' => 'Market 2',
+        //     'key' => 'm_suburb_02',
+        //     'type' => 'propan',
+        //     'latitude' => 41.3111,
+        //     'longitude' => 69.2797,
+        // ]);
 
         // 5. Заполняем остатки (ProductStock)
-        ProductStock::create([
-            'market_id' => $market1->id,
-            'product_id' => $product1->id,
-            'qty' => 100
-        ]);
+        // ProductStock::create([
+        //     'market_id' => $market1->id,
+        //     'product_id' => $product1->id,
+        //     'qty' => 100
+        // ]);
 
-        ProductStock::create([
-            'market_id' => $market1->id,
-            'product_id' => $product2->id,
-            'qty' => 50
-        ]);
+        // ProductStock::create([
+        //     'market_id' => $market1->id,
+        //     'product_id' => $product2->id,
+        //     'qty' => 50
+        // ]);
 
-        ProductStock::create([
-            'market_id' => $market2->id,
-            'product_id' => $product3->id,
-            'qty' => 30
-        ]);
+        // ProductStock::create([
+        //     'market_id' => $market2->id,
+        //     'product_id' => $product3->id,
+        //     'qty' => 30
+        // ]);
 
         // 6. Привязываем пользователей к маркетам (Связь Многие-ко-многим)
         // Привяжем первых 5 юзеров к первому маркету
-        $market1->users()->attach([$user1->id, $user2->id]);
+        // $market1->users()->attach([$user1->id, $user2->id]);
 
         // Привяжем 3-го и 6-го юзера ко второму маркету (демонстрация пересечения)
-        $market2->users()->attach([$user1->id, $user2->id]);
+        // $market2->users()->attach([$user1->id, $user2->id]);
         // Group::factory(5)->create();
 
         // // Создадим 20 торговых точек (Market)
