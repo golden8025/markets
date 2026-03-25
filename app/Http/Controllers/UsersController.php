@@ -172,7 +172,7 @@ class UsersController extends Controller
 
             // Подгружаем последний визит с его инфой
             $query->with(['visits' => function($v) {
-                $v->latest()->with('visitInfos')->limit(1);
+                $v->latest()->with('info')->limit(1);
             }]);
         }])
         ->get()
@@ -185,7 +185,7 @@ class UsersController extends Controller
                 $lastVisit = $market->visits->first();
                 $market->last_profit = $lastVisit ? $lastVisit->visitInfos->sum('profit') : 0;
                 // "Минус" (сколько товара ушло/продано)
-                $market->last_sold = $lastVisit ? $lastVisit->visitInfos->sum('loaded') - $lastVisit->visitInfos->sum('left') : 0;
+                $market->last_sold = $lastVisit ? $lastVisit->visitInfos->sum('loaded') - $lastVisit->visitInfos->sum('`left`') : 0;
                 
                 unset($market->visits); // Убираем лишнее из JSON
             });
