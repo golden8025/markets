@@ -157,37 +157,50 @@ class UsersController extends Controller
 
     public function group_markets2()
     {
-        $user = Auth::user();
+        $user = auth()->user();
 
-        $groups = Group::with(['markets' => function ($query) use ($user) {
-            // Фильтрация для агента
-            $query->when($user->role === 'agent', function ($q) use ($user) {
-                return $q->whereHas('users', function ($sq) use ($user) {
-                    $sq->where('users.id', $user->id);
+        $groups = Group::query()
+            ->with(['markets' => function ($query) use ($user) {
+                // 1. Фильтрация маркетов для агента
+                $query->when($user->role === 'agent', function ($q) use ($user) {
+                    $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
                 });
-            });
 
-            // Добавляем сумму всех продуктов в магазине (qty)
-            $query->withSum('stocks as total_qty', 'qty');
+                // 2. Считаем текущий общий остаток (qty) в маркете
+                $query->withSum('stocks as total_qty', 'qty');
 
-            // Подгружаем последний визит с его инфой
-            $query->with(['visits' => function($v) {
-                $v->latest()->with('info')->limit(1);
-            }]);
-        }])
-        ->get()
-        ->filter(fn($group) => $group->markets->isNotEmpty())
-        ->values();
-
-        // Преобразуем данные перед отправкой, чтобы Flutter было легче их читать
-        $groups->each(function($group) {
-            $group->markets->each(function($market) {
-                $lastVisit = $market->visits->first();
-                $market->last_profit = $lastVisit ? $lastVisit->visitInfos->sum('profit') : 0;
-                // "Минус" (сколько товара ушло/продано)
-                $market->last_sold = $lastVisit ? $lastVisit->visitInfos->sum('loaded') - $lastVisit->visitInfos->sum('`left`') : 0;
+                // 3. Подгружаем ТОЛЬКО один последний визит (Laravel way)
+                // Убедитесь, что в модели Market есть связь latestVisit (см. ниже)
+                $query->with(['latestVisit.info']);
                 
-                unset($market->visits); // Убираем лишнее из JSON
+                // 4. Агрегаты для последнего визита (чтобы не считать в цикле)
+                // Считаем сумму profit и (loaded - left) через подзапросы для скорости
+                $query->withAggregate('latestVisit as last_profit', 'profit', 'sum');
+            }])
+            // Оставляем только группы, в которых есть доступные маркеты
+            ->whereHas('markets', function ($query) use ($user) {
+                $query->when($user->role === 'agent', function ($q) use ($user) {
+                    $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
+                });
+            })
+            ->get();
+
+        // Преобразование для Flutter (делаем JSON плоским и понятным)
+        $groups->each(function ($group) {
+            $group->markets->each(function ($market) {
+                $lastVisit = $market->latestVisit;
+                
+                // Рассчитываем проданное: sum(loaded) - sum(left)
+                if ($lastVisit) {
+                    $market->last_sold = $lastVisit->info->sum('loaded') - $lastVisit->info->sum('left');
+                    $market->last_profit = (int) $lastVisit->info->sum('profit');
+                } else {
+                    $market->last_sold = 0;
+                    $market->last_profit = 0;
+                }
+
+                // Удаляем вложенность, чтобы облегчить JSON
+                unset($market->latestVisit);
             });
         });
 

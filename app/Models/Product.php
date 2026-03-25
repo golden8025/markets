@@ -14,11 +14,6 @@ class Product extends Model
         
     ];
 
-
-    // public function market()
-    // {
-    //     return $this->hasMany(Market::class, 'product_stock');
-    // }
     public function markets()
     {
         return $this->belongsToMany(Market::class, 'product_stocks')

@@ -23,24 +23,14 @@ class Market extends Model
         return $this->belongsTo(Group::class);
     }
 
-
-    // public function stock(){
-    //     return $this->hasMany(ProductStock::class);
-    // }
-
-    // public function products(){
-    //     return $this->hasMany(Product::class, 'product_stock');
-    // }
-
     public function products()
     {
-        // Указываем промежуточную таблицу 'product_stocks'
-        // и можем подтянуть дополнительные поля, например 'qty'
+        
         return $this->belongsToMany(Product::class, 'product_stocks')
                     ->withPivot('qty');
     }
 
-    public function stocks() // Это связь "Один-ко-многим" к записям в таблице остатков
+    public function stocks() 
     {
         return $this->hasMany(ProductStock::class);
     }
