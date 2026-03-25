@@ -108,7 +108,7 @@ class MarketController extends Controller
             ->select(
                 DB::raw('SUM(profit) as total_profit'),
                 DB::raw('SUM(loaded) as total_loaded'),
-                DB::raw('SUM(loaded - left) as total_sold')
+                DB::raw('SUM(`loaded` - `left`) as total_sold')
             )->first();
 
         // 2. Общий "Минус" (расчет по вашей формуле из предыдущего шага)
@@ -128,7 +128,7 @@ class MarketController extends Controller
         $lastMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
-            ->sum(DB::raw('loaded - left'));
+            ->sum(DB::raw('`loaded` - `left`'));
 
         // Расчет разницы в процентах или единицах
         $diffSold = $thisMonthSold - $lastMonthSold;
