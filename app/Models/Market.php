@@ -49,5 +49,9 @@ class Market extends Model
         return $this->belongsToMany(User::class, 'market_users');
     }
 
+    public function visits()
+    {
+        return $this->hasMany(Visit::class);
+    }
     
 }
