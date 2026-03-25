@@ -48,4 +48,6 @@ class Market extends Model
     public function users(){
         return $this->belongsToMany(User::class, 'market_users');
     }
+
+    
 }

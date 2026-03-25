@@ -155,6 +155,45 @@ class UsersController extends Controller
         return response()->json($groups);
     }
 
+    public function group_markets2()
+    {
+        $user = Auth::user();
+
+        $groups = Group::with(['markets' => function ($query) use ($user) {
+            // Фильтрация для агента
+            $query->when($user->role === 'agent', function ($q) use ($user) {
+                return $q->whereHas('users', function ($sq) use ($user) {
+                    $sq->where('users.id', $user->id);
+                });
+            });
+
+            // Добавляем сумму всех продуктов в магазине (qty)
+            $query->withSum('stocks as total_qty', 'qty');
+
+            // Подгружаем последний визит с его инфой
+            $query->with(['visits' => function($v) {
+                $v->latest()->with('visitInfos')->limit(1);
+            }]);
+        }])
+        ->get()
+        ->filter(fn($group) => $group->markets->isNotEmpty())
+        ->values();
+
+        // Преобразуем данные перед отправкой, чтобы Flutter было легче их читать
+        $groups->each(function($group) {
+            $group->markets->each(function($market) {
+                $lastVisit = $market->visits->first();
+                $market->last_profit = $lastVisit ? $lastVisit->visitInfos->sum('profit') : 0;
+                // "Минус" (сколько товара ушло/продано)
+                $market->last_sold = $lastVisit ? $lastVisit->visitInfos->sum('loaded') - $lastVisit->visitInfos->sum('left') : 0;
+                
+                unset($market->visits); // Убираем лишнее из JSON
+            });
+        });
+
+        return response()->json($groups);
+    }
+
     public function syncMarkets(Request $request, $id) {
         $user = User::findOrFail($id);
         

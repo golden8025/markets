@@ -27,6 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/groups' , [GroupController::class, 'index']);
 
     Route::get('/users/markets', [UsersController::class, 'group_markets']);
+    Route::get('/markets/info', [UsersController::class, 'group_markets2']);
 
     // Route::post('/visits', [VisitController::class, 'store']);
     Route::get('/visits', [VisitController::class, 'index']);
