@@ -43,5 +43,10 @@ class Market extends Model
     {
         return $this->hasMany(Visit::class);
     }
-    
+
+
+    public function latestVisit()
+    {
+        return $this->hasOne(Visit::class)->latestOfMany();
+    }
 }
