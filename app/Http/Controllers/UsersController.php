@@ -155,47 +155,109 @@ class UsersController extends Controller
         return response()->json($groups);
     }
 
-    public function group_markets2()
+//     public function group_markets2()
+// {
+//     $user = auth()->user();
+
+//     $groups = Group::query()
+//         // Загружаем только те группы, где есть маркеты, доступные пользователю
+//         ->whereHas('markets', function ($q) use ($user) {
+//             $q->when($user->role === 'agent', function ($sq) use ($user) {
+//                 $sq->whereHas('users', fn($u) => $u->where('users.id', $user->id));
+//             });
+//         })
+//         ->with(['markets' => function ($query) use ($user) {
+//             // Фильтрация самих маркетов внутри групп
+//             $query->when($user->role === 'agent', function ($q) use ($user) {
+//                 $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
+//             });
+
+//             // Считаем общие остатки на складе маркета
+//             $query->withSum('stocks as total_qty', 'qty');
+
+//             // Загружаем последний визит и его детали (теперь через связь в модели)
+//             $query->with(['latestVisit.info']);
+//         }])
+//         ->get();
+
+//     // Проходимся по коллекции для формирования данных под Flutter
+//     $groups->each(function ($group) {
+//         foreach ($group->markets as $market) {
+//             $lastVisit = $market->latestVisit;
+
+//             if ($lastVisit) {
+//                 // Используем метод info(), как в вашей модели Visit
+//                 $market->last_profit = (int) $lastVisit->info->sum('profit');
+//                 $market->last_sold = $lastVisit->info->sum('loaded') - $lastVisit->info->sum('left');
+//             } else {
+//                 $market->last_profit = 0;
+//                 $market->last_sold = 0;
+//             }
+
+//             // Убираем объект визита, чтобы JSON был компактным
+//             $market->makeHidden('latestVisit');
+//         }
+//     });
+
+//     return response()->json($groups);
+// }
+
+public function group_markets2()
 {
     $user = auth()->user();
 
     $groups = Group::query()
-        // Загружаем только те группы, где есть маркеты, доступные пользователю
         ->whereHas('markets', function ($q) use ($user) {
             $q->when($user->role === 'agent', function ($sq) use ($user) {
                 $sq->whereHas('users', fn($u) => $u->where('users.id', $user->id));
             });
         })
         ->with(['markets' => function ($query) use ($user) {
-            // Фильтрация самих маркетов внутри групп
             $query->when($user->role === 'agent', function ($q) use ($user) {
                 $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
             });
 
-            // Считаем общие остатки на складе маркета
+            // Подгружаем сумму остатков. Убедитесь, что в Market есть hasMany(ProductStock::class, 'market_id')
             $query->withSum('stocks as total_qty', 'qty');
 
-            // Загружаем последний визит и его детали (теперь через связь в модели)
-            $query->with(['latestVisit.info']);
+            // Нам нужны данные продуктов внутри последнего визита, чтобы знать их цену (price)
+            $query->with(['latestVisit.info.product']);
         }])
         ->get();
 
-    // Проходимся по коллекции для формирования данных под Flutter
     $groups->each(function ($group) {
         foreach ($group->markets as $market) {
             $lastVisit = $market->latestVisit;
 
-            if ($lastVisit) {
-                // Используем метод info(), как в вашей модели Visit
-                $market->last_profit = (int) $lastVisit->info->sum('profit');
-                $market->last_sold = $lastVisit->info->sum('loaded') - $lastVisit->info->sum('left');
+            if ($lastVisit && $lastVisit->info->isNotEmpty()) {
+                // 1. Фактическая выручка (сколько агент зафиксировал в поле profit)
+                $actualCash = $lastVisit->info->sum('profit');
+
+                // 2. Теоретическая выручка (сколько ДОЛЖНО быть по продажам)
+                // (Загружено - Осталось) * Цена продукта
+                $expectedCash = $lastVisit->info->sum(function ($detail) {
+                    $soldQty = $detail->loaded - $detail->left;
+                    return $soldQty * ($detail->product->price ?? 0);
+                });
+
+                $market->last_profit = (int) $actualCash;
+                
+                // 3. Расчет "Минуса" (Разница между тем что должно быть и тем что в кассе)
+                // Если результат положительный — это недостача
+                $market->last_debt = (int) ($expectedCash - $actualCash);
+                
+                // Для справки оставим количество проданных штук
+                $market->last_sold_qty = $lastVisit->info->sum('loaded') - $lastVisit->info->sum('left');
             } else {
                 $market->last_profit = 0;
-                $market->last_sold = 0;
+                $market->last_debt = 0;
+                $market->last_sold_qty = 0;
             }
 
-            // Убираем объект визита, чтобы JSON был компактным
-            $market->makeHidden('latestVisit');
+            // Гарантируем, что total_qty не null
+            $market->total_qty = (int) ($market->total_qty ?? 0);
+
+            $market->makeHidden(['latestVisit', 'stocks']);
         }
     });
 
