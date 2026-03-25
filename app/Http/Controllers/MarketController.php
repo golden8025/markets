@@ -123,7 +123,7 @@ class MarketController extends Controller
         $thisMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->whereBetween('visits.created_at', [$startOfMonth, Carbon::now()])
-            ->sum(DB::raw('loaded - left'));
+            ->sum(DB::raw('`loaded` - `left`'));
 
         $lastMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
@@ -190,7 +190,7 @@ class MarketController extends Controller
                 ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
                 ->whereDate('visits.created_at', $date)
                 ->select(
-                    DB::raw('SUM(loaded - left) as sales'),
+                    DB::raw('SUM(`loaded` - `left`) as sales'),
                     DB::raw('SUM(profit) as income')
                 )->first();
 
