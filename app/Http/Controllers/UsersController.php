@@ -213,50 +213,46 @@ public function group_markets2()
             });
         })
         ->with(['markets' => function ($query) use ($user) {
+            // Фильтруем маркеты для агента
             $query->when($user->role === 'agent', function ($q) use ($user) {
                 $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
             });
 
-            // Подгружаем сумму остатков. Убедитесь, что в Market есть hasMany(ProductStock::class, 'market_id')
-            $query->withSum('stocks as total_qty', 'qty');
-
-            // Нам нужны данные продуктов внутри последнего визита, чтобы знать их цену (price)
-            $query->with(['latestVisit.info.product']);
+            // ЖАДНАЯ ЗАГРУЗКА (Eager Loading) — это уберет таймаут
+            // Загружаем сумму остатков и последний визит со всеми вложенными данными
+            $query->withSum('stocks as total_qty', 'qty')
+                  ->with(['latestVisit.info.product']); 
         }])
         ->get();
 
     $groups->each(function ($group) {
         foreach ($group->markets as $market) {
+            // Достаем связь, которую мы загрузили через latestOfMany()
             $lastVisit = $market->latestVisit;
 
             if ($lastVisit && $lastVisit->info->isNotEmpty()) {
-                // 1. Фактическая выручка (сколько агент зафиксировал в поле profit)
-                $actualCash = $lastVisit->info->sum('profit');
+                // 1. Прибыль берем из коллекции visit_infos (связь info)
+                $market->last_profit = (int) $lastVisit->info->sum('profit');
 
-                // 2. Теоретическая выручка (сколько ДОЛЖНО быть по продажам)
-                // (Загружено - Осталось) * Цена продукта
+                // 2. Считаем дебет (ожидаемые деньги - реальные деньги)
                 $expectedCash = $lastVisit->info->sum(function ($detail) {
                     $soldQty = $detail->loaded - $detail->left;
                     return $soldQty * ($detail->product->price ?? 0);
                 });
 
-                $market->last_profit = (int) $actualCash;
+                $market->last_debt = (int) ($expectedCash - $market->last_profit);
                 
-                // 3. Расчет "Минуса" (Разница между тем что должно быть и тем что в кассе)
-                // Если результат положительный — это недостача
-                $market->last_debt = (int) ($expectedCash - $actualCash);
-                
-                // Для справки оставим количество проданных штук
-                $market->last_sold_qty = $lastVisit->info->sum('loaded') - $lastVisit->info->sum('left');
+                // 3. Общее количество проданного товара
+                $market->last_sold_qty = (int) ($lastVisit->info->sum('loaded') - $lastVisit->info->sum('left'));
             } else {
+                // Если визитов еще не было
                 $market->last_profit = 0;
                 $market->last_debt = 0;
                 $market->last_sold_qty = 0;
             }
 
-            // Гарантируем, что total_qty не null
+            // Очищаем JSON от лишних данных, чтобы Flutter было легче парсить
             $market->total_qty = (int) ($market->total_qty ?? 0);
-
             $market->makeHidden(['latestVisit', 'stocks']);
         }
     });
