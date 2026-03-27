@@ -81,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Markets
     Route::post('/markets', [MarketController::class, 'store']);
     Route::get('/markets/info', [UsersController::class, 'group_markets2']);
+    Route::get('/details/{id}', [MarketController::class, 'details']);
     Route::get('/markets/{id}', [MarketController::class, 'show']);
     Route::get('/allmarkets', [MarketController::class, 'all_markets']);
     Route::get('/markets/products/{id}', [MarketController::class, 'products']);

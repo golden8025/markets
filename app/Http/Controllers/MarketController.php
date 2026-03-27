@@ -106,6 +106,49 @@ class MarketController extends Controller
         return response()->json($market);
     }
 
+    public function details(string $id)
+    {
+        $market = Market::with(['products'])->findOrFail($id);
+
+        $lastVisit = Visit::where('market_id', $id)
+            ->with('infos')
+            ->orderBy('visit_date', 'desc')
+            ->first();
+
+        $lastStats = [
+            'profit' => 0,
+            'debt' => 0,
+            'sold_qty' => 0,
+            'minus_qty' => 0,
+        ];
+
+        if ($lastVisit) {
+            $lastStats['profit'] = $lastVisit->infos->sum('profit');
+            $lastStats['debt'] = $lastVisit->infos->sum('debt');
+            $lastStats['sold_qty'] = $lastVisit->infos->sum('sold_qty');
+            $lastStats['minus_qty'] = $lastVisit->infos->where('qty', '<', 0)->count();
+        }
+
+        $monthStats = Visit::where('market_id', $id)
+            ->whereMonth('visit_date', now()->month)
+            ->join('visit_infos', 'visits.id', '=', 'visit_infos.visit_id')
+            ->selectRaw('
+                SUM(visit_infos.profit) as total_profit,
+                SUM(visit_infos.debt) as total_debt,
+                SUM(visit_infos.sold_qty) as total_sold
+            ')
+            ->first();
+
+        return response()->json([
+            'market' => $market,
+            'last_visit' => $lastStats,
+            'month_summary' => [
+                'profit' => $monthStats->total_profit ?? 0,
+                'debt' => $monthStats->total_debt ?? 0,
+                'sold' => $monthStats->total_sold ?? 0,
+            ]
+        ]);
+    }
    
     public function dashboard()
     {
@@ -114,7 +157,6 @@ class MarketController extends Controller
         $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
         $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
 
-        // 1. Статистика за СЕГОДНЯ
         $todayStats = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->whereDate('visits.created_at', $today)
@@ -124,8 +166,7 @@ class MarketController extends Controller
                 DB::raw('SUM(`loaded` - `left`) as total_sold')
             )->first();
 
-        // 2. Общий "Минус" (расчет по вашей формуле из предыдущего шага)
-        // Считаем как: (Продано * Цена) - Факт.Прибыль
+
         $allVisitsInfo = VisitInfo::with('product')->get();
         $totalMinus = $allVisitsInfo->sum(function ($info) {
             $expected = ($info->loaded - $info->left) * ($info->product->price ?? 0);
