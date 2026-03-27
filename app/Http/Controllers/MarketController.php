@@ -81,16 +81,29 @@ class MarketController extends Controller
     }
 
 
+    // public function show(string $id)
+    // {
+    //     try{
+    //         $market = Market::where('id', $id)->with('products')->firstOrFail();            
+    //         return response()->json($market);
+    //     }
+    //     catch(ModelNotFoundException $ex){
+    //         return $this->error('Malumot topilmadi', 404);
+    //     }  
+        
+    // }
+
     public function show(string $id)
     {
-        try{
-            $market = Market::where('id', $id)->with('products')->firstOrFail();            
-            return response()->json($market);
+        $market = Market::with('products')->find($id);
+
+        if (!$market) {
+            return response()->json([
+                'message' => 'Topilmadi'
+            ], 404);
         }
-        catch(ModelNotFoundException $ex){
-            return $this->error('Malumot topilmadi', 404);
-        }  
-        
+
+        return response()->json($market);
     }
 
    
