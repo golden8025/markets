@@ -11,15 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('visit_infos', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('visit_id')->constrained()->cascadeOnDelete();
-            $table->integer('loaded');
-            $table->integer('left');
-            $table->integer('profit');
-            $table->timestamps();
-        });
+        
     }
 
     /**

@@ -6,8 +6,8 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StatController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\VisitController;
-use App\Models\Market;
-use App\Models\User;
+use App\Http\Controllers\DetailsController;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -81,7 +81,6 @@ Route::middleware('auth:sanctum')->group(function () {
     // Markets
     Route::post('/markets', [MarketController::class, 'store']);
     Route::get('/markets/info', [UsersController::class, 'group_markets2']);
-    Route::get('/details/{id}', [MarketController::class, 'details']);
     Route::get('/markets/{id}', [MarketController::class, 'show']);
     Route::get('/allmarkets', [MarketController::class, 'all_markets']);
     Route::get('/markets/products/{id}', [MarketController::class, 'products']);
@@ -105,6 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/agentstats', [StatController::class, 'agentsStatistics']);
         Route::get('/marketstats', [StatController::class, 'marketsStatistics']);
         Route::get('/visits/filters', [VisitController::class, 'getFilterData']);
+        Route::get('/details/{id}', [DetailsController::class, 'show']);
 
         // Resources
         // Note: store/show are handled in the general group above
