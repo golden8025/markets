@@ -17,7 +17,7 @@ class DetailsController extends Controller
     public function details(string $id)
     {
         $market = Market::with('group')->findOrFail($id);
-        $dateFrom = now()->subDays(29)->startOfDay();
+        $dateFrom = now()->subDays(7)->startOfDay();
         $dateTo = now()->endOfDay();
 
 
