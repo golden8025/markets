@@ -189,32 +189,32 @@ class DetailsController extends Controller
     //     ]);
     // }
 
-    public function details($id)
+    public function details(string $id)
     {
-        // 1. Основная информация о магазине с его группой
+        // 1. Информация о магазине и его группе
         $market = Market::with('group')->findOrFail($id);
 
-        // 2. Данные последнего визита
+        // 2. Последний визит с продуктами
         $lastVisit = Visit::where('market_id', $id)
-            ->with(['user', 'info.product']) // Данные об агенте и продуктах [cite: 221, 226]
+            ->with(['user', 'visitInfos.product'])
             ->latest()
             ->first();
 
-        // 3. Статистика за последние 30 дней (как требует экран [cite: 21])
+        // 3. Статистика за последние 30 дней
         $dateFrom = now()->subDays(30);
         
-        // Агрегируем общие показатели
-        $statsSummary = DB::table('visit_infos')
+        // Общие итоги
+        $summary = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->where('visits.market_id', $id)
             ->where('visits.created_at', '>=', $dateFrom)
             ->select(
                 DB::raw('COUNT(DISTINCT visits.id) as total_visits'),
-                DB::raw('SUM(loaded - `left`) as total_sold_qty'), // Продано = Загружено - Остаток 
-                DB::raw('SUM(profit) as total_profit')
+                DB::raw('SUM(visit_infos.profit) as total_profit'),
+                DB::raw('SUM(visit_infos.loaded - visit_infos.left) as total_sold_qty')
             )->first();
 
-        // Кунлик даромад (для графика [cite: 111])
+        // Данные для графика (по дням)
         $dailyStats = DB::table('visits')
             ->join('visit_infos', 'visits.id', '=', 'visit_infos.visit_id')
             ->where('visits.market_id', $id)
@@ -224,56 +224,37 @@ class DetailsController extends Controller
                 DB::raw('SUM(profit) as profit')
             )
             ->groupBy('date')
-            ->orderBy('date')
+            ->orderBy('date', 'asc')
             ->get();
 
-        // 4. Текущие остатки (Stocks [cite: 154])
-        $stocks = ProductStock::where('market_id', $id)
+        // 4. Текущие остатки в магазине (Stocks)
+        $stocks = DB::table('product_stocks')
             ->join('products', 'product_stocks.product_id', '=', 'products.id')
-            ->select('products.name', 'product_stocks.qty', 'products.price') // [cite: 223, 224]
+            ->where('product_stocks.market_id', $id)
+            ->select('products.name', 'product_stocks.qty', 'products.price')
             ->get();
 
-        // Формируем JSON ответ под вашу Flutter-модель
         return response()->json([
             'market' => [
                 'id' => $market->id,
                 'name' => $market->name,
                 'group_name' => $market->group?->name,
-                'type' => $market->type, // metan, propan, dokon [cite: 219]
+                'type' => $market->type,
                 'type_label' => ucfirst($market->type),
                 'key' => $market->key,
                 'latitude' => $market->latitude,
                 'longitude' => $market->longitude,
             ],
-            'last_visit' => $lastVisit ? [
-                'visited_at' => $lastVisit->created_at->toISOString(),
-                'agent_name' => $lastVisit->user->name, // [cite: 216]
-                'comment' => $lastVisit->comment,
-                'total_profit' => $lastVisit->info->sum('profit'),
-                'total_loss' => 0, // Если в БД нет поля "убыток", возвращаем 0
-                'products' => $lastVisit->info->map(function($info) {
-                    return [
-                        'name' => $info->product->name,
-                        'price' => $info->product->price,
-                        'loaded_qty' => $info->loaded,
-                        'left_qty' => $info->left,
-                        'sold_qty' => $info->loaded - $info->left,
-                        'profit' => $info->profit,
-                    ];
-                }),
-            ] : null,
             'statistics' => [
-                'date_from' => $dateFrom->format('d.m.Y'),
-                'date_to' => now()->format('d.m.Y'),
                 'summary' => [
-                    'total_visits' => $statsSummary->total_visits ?? 0,
-                    'total_sold_qty' => (int)($statsSummary->total_sold_qty ?? 0),
-                    'total_profit' => (int)($statsSummary->total_profit ?? 0),
+                    'total_visits' => (int)($summary->total_visits ?? 0),
+                    'total_profit' => (int)($summary->total_profit ?? 0),
+                    'total_sold_qty' => (int)($summary->total_sold_qty ?? 0),
                     'total_loss' => 0,
                 ],
                 'daily_stats' => $dailyStats,
             ],
-            'stocks' => $stocks
+            'stocks' => $stocks,
         ]);
     }
 }
