@@ -196,7 +196,7 @@ class DetailsController extends Controller
 
         // 2. Последний визит с продуктами
         $lastVisit = Visit::where('market_id', $id)
-            ->with(['user', 'visitInfos.product'])
+            ->with(['user', 'info.product'])
             ->latest()
             ->first();
 
