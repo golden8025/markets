@@ -28,7 +28,7 @@ class DetailsController extends Controller
     //     // ── 2. Последний визит этого маркета ─────────────────────────────────
     //     $lastVisit = Visit::where('market_id', $id)
     //         ->with([
-    //             'visitInfos.product',
+    //             'info.product',
     //             'visitImages',
     //             'user:id,name',
     //         ])
@@ -38,7 +38,7 @@ class DetailsController extends Controller
     //     $lastVisitData = null;
 
     //     if ($lastVisit) {
-    //         $products = $lastVisit->visitInfos->map(function (VisitInfo $info) {
+    //         $products = $lastVisit->info->map(function (VisitInfo $info) {
     //             // Теоретическая выручка = цена × количество проданных
     //             $sold     = $info->loaded - $info->left;   // сколько продано
     //             $expected = $info->product->price * $sold; // ожидаемая выручка
@@ -196,7 +196,7 @@ class DetailsController extends Controller
 
         // 2. Данные последнего визита
         $lastVisit = Visit::where('market_id', $id)
-            ->with(['user', 'visitInfos.product']) // Данные об агенте и продуктах [cite: 221, 226]
+            ->with(['user', 'info.product']) // Данные об агенте и продуктах [cite: 221, 226]
             ->latest()
             ->first();
 
@@ -249,9 +249,9 @@ class DetailsController extends Controller
                 'visited_at' => $lastVisit->created_at->toISOString(),
                 'agent_name' => $lastVisit->user->name, // [cite: 216]
                 'comment' => $lastVisit->comment,
-                'total_profit' => $lastVisit->visitInfos->sum('profit'),
+                'total_profit' => $lastVisit->info->sum('profit'),
                 'total_loss' => 0, // Если в БД нет поля "убыток", возвращаем 0
-                'products' => $lastVisit->visitInfos->map(function($info) {
+                'products' => $lastVisit->info->map(function($info) {
                     return [
                         'name' => $info->product->name,
                         'price' => $info->product->price,
