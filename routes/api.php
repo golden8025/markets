@@ -45,10 +45,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/statistics', [MarketController::class, 'statistics']);
         Route::get('/agentstats', [StatController::class, 'agentsStatistics']);
         Route::get('/marketstats', [StatController::class, 'marketsStatistics']);
+
         Route::get('/visits/filters', [VisitController::class, 'getFilterData']);
+        Route::get('/visits/edit/{id}', [VisitController::class, 'edit']);
+
+
         Route::get('/details/{id}', [DetailsController::class, 'details']);
 
-        // Resources
         // Note: store/show are handled in the general group above
         // Route::apiResource('markets', MarketController::class)->except(['store', 'show', 'index']); 
         Route::apiResource('products', ProductController::class);
@@ -57,6 +60,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/groups/update/{id}', [GroupController::class, 'updateGroup']);
         Route::get('/groups/markets', [GroupController::class, 'getGroups']);
         Route::post('/groups', [GroupController::class, 'store']);
+
         Route::get('/users/{id}/markets', [UsersController::class, 'markets']);
         Route::post('/users/{id}/sync-markets', [UsersController::class, 'syncMarkets']);
     });

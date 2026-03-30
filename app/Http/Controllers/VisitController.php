@@ -18,45 +18,7 @@ use Illuminate\Support\Str;
 
 class VisitController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    // public function index()
-    // {
-    //     $visits = Visit::with(['market', 'info.product'])
-    //         ->orderBy('created_at', 'desc')
-    //         ->get();
 
-    //     $data = $visits->map(function ($visit) {
-    //         // Предварительные расчеты по всем товарам в визите
-    //         $totals = $visit->info->reduce(function ($carry, $info) {
-    //             $sold = $info->loaded - $info->left;
-    //             $expected = $sold * ($info->product->price ?? 0);
-                
-    //             // Считаем "минус" (если прибыль меньше ожидаемой, иначе 0)
-    //             $minus = max(0, $expected - $info->profit);
-
-    //             $carry['sold'] += $sold;
-    //             $carry['profit'] += $info->profit;
-    //             $carry['minus'] += $minus;
-                
-    //             return $carry;
-    //         }, ['sold' => 0, 'profit' => 0, 'minus' => 0]);
-
-    //         return [
-    //             'id'             => $visit->id,
-    //             'market_name'    => $visit->market->name ?? 'Н/Д',
-    //             'visit_time'     => $visit->created_at->format('d.m.Y H:i'),
-    //             'total_sold'     => $totals['sold'],
-    //             'total_profit'   => $totals['profit'],
-    //             'total_minus'    => $totals['minus'],
-    //             // Сокращаем комментарий до 3 слов
-    //             'short_comment'  => Str::words($visit->comment, 3, '...'),
-    //         ];
-    // });
-
-    // return response()->json($data);
-    // }
 
 
 
@@ -139,15 +101,14 @@ public function index(Request $request)
             'markets' => Market::all(['id', 'name', 'group_id']),
         ]);
     }
-    /**
-     * Store a newly created resource in storage.
-     */
+
+
     public function store(StoreVisitRequest $request)
     {
         return DB::transaction(function () use ($request) {
             
             $visit = Visit::create([
-                'user_id'   => auth()->id(),  //auth()->id(), // или $request->user_id
+                'user_id'   => auth()->id(), 
                 'market_id' => $request->market_id,
                 'comment'   => $request->comment,
             ]);
@@ -238,20 +199,84 @@ public function index(Request $request)
         ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+
+
+    public function edit($id)
     {
-        //
+        try {
+            // Загружаем визит вместе со связанными данными
+            $visit = Visit::with([
+                'market', 
+                'info.product'
+            ])->findOrFail($id);
+
+            return response()->json($visit, 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Visit topilmadi',
+                'error' => $e->getMessage()
+            ], 404);
+        }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+
+    public function update(Request $request, $id)
     {
-        //
+        return DB::transaction(function () use ($request, $id) {
+            $visit = Visit::with('visit_infos')->findOrFail($id);
+
+            // 1. "Откатываем" старое влияние визита на склад
+            foreach ($visit->visit_infos as $oldInfo) {
+                $stock = ProductStock::where('market_id', $visit->market_id)
+                    ->where('product_id', $oldInfo->product_id)
+                    ->first();
+                
+                if ($stock) {
+                    // Вычитаем то, что было добавлено в прошлый раз
+                    $stock->decrement('qty', ($oldInfo->left + $oldInfo->loaded));
+                }
+            }
+
+            // 2. Обновляем основные данные визита
+            $visit->update([
+                'comment' => $request->comment,
+            ]);
+
+            // 3. Удаляем старые записи о товарах и создаем новые (или обновляем)
+            if ($request->has('products')) {
+                // Удаляем старые привязки
+                $visit->visit_infos()->delete();
+
+                foreach ($request->products as $item) {
+                    VisitInfo::create([
+                        'visit_id'   => $visit->id,
+                        'product_id' => $item['id'],
+                        'loaded'     => $item['loaded'],
+                        'left'       => $item['left'],
+                        'profit'     => $item['profit'],
+                    ]);
+
+                    // Применяем НОВЫЕ данные к складу
+                    ProductStock::updateOrCreate(
+                        ['market_id' => $visit->market_id, 'product_id' => $item['id']],
+                        ['qty' => DB::raw("qty + " . ($item['left'] + $item['loaded']))]
+                    );
+                }
+            }
+
+            // 4. Добавляем новые изображения, если они есть
+            if ($request->hasFile('images')) {
+                foreach ($request->file('images') as $image) {
+                    $path = $image->store('visits', 'public');
+                    VisitImage::create([
+                        'visit_id' => $visit->id,
+                        'image'    => $path,
+                    ]);
+                }
+            }
+
+            return response()->json(['message' => 'O\'zgartirildi!', 'visit' => $visit->load('visit_infos')]);
+        });
     }
 
     /**
