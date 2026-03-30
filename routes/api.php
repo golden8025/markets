@@ -55,7 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('users', UsersController::class);
         
         Route::post('/groups/update/{id}', [GroupController::class, 'updateGroup']);
-        Route::post('/goups/markets', [GroupController::class, 'getGroups']);
+        Route::get('/goups/markets', [GroupController::class, 'getGroups']);
         Route::post('/groups', [GroupController::class, 'store']);
         Route::get('/users/{id}/markets', [UsersController::class, 'markets']);
         Route::post('/users/{id}/sync-markets', [UsersController::class, 'syncMarkets']);
