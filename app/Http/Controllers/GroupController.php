@@ -25,6 +25,13 @@ class GroupController extends Controller
 
     }
 
+    public function getGroups()
+    {
+      
+        $groups = Group::with('markets:id,name,group_id')->get();
+        return response()->json($groups);
+    }
+
     public function updateGroup(Request $request, $id)
     {
         // Проверяем существование маркета 
