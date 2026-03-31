@@ -32,9 +32,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/markets', [UsersController::class, 'group_markets']);
 
     // Visits & Products
+    Route::get('/visits/edit/{id}', [VisitController::class, 'edit']);
     Route::get('/visits', [VisitController::class, 'index']);
+    Route::post('/visits/update/{id}', [VisitController::class, 'update']);
     Route::post('/visits', [VisitController::class, 'store']);
     Route::get('/visits/{id}', [VisitController::class, 'show']);
+
+
+
     Route::get('/products/missing/{marketId}', [ProductController::class, 'getMissingProducts']);
     Route::post('/product-stocks/initial', [ProductController::class, 'storeInitial']);
 
@@ -47,7 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/marketstats', [StatController::class, 'marketsStatistics']);
 
         Route::get('/visits/filters', [VisitController::class, 'getFilterData']);
-        Route::get('/visits/edit/{id}', [VisitController::class, 'edit']);
+        
 
 
         Route::get('/details/{id}', [DetailsController::class, 'details']);
@@ -66,6 +71,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+// Commands for optimizing server after completing project:
+// php artisan config:cache
+// php artisan route:cache
+// php artisan view:cache
 
 
 
