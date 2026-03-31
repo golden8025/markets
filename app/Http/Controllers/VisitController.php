@@ -113,7 +113,7 @@ public function index(Request $request)
                 'comment'   => $request->comment,
             ]);
 
-            // 2. Добавляем информацию о товарах (visit_infos)
+            // 2. Добавляем информацию о товарах (info)
             // Ожидаем массив products: [['id' => 1, 'loaded' => 10, 'left' => 2, 'profit' => 500], ...]
             if ($request->has('products')) {
                 foreach ($request->products as $item) {
@@ -223,10 +223,10 @@ public function index(Request $request)
     public function update(Request $request, $id)
     {
         return DB::transaction(function () use ($request, $id) {
-            $visit = Visit::with('visit_infos')->findOrFail($id);
+            $visit = Visit::with('info')->findOrFail($id);
 
             // 1. "Откатываем" старое влияние визита на склад
-            foreach ($visit->visit_infos as $oldInfo) {
+            foreach ($visit->info as $oldInfo) {
                 $stock = ProductStock::where('market_id', $visit->market_id)
                     ->where('product_id', $oldInfo->product_id)
                     ->first();
@@ -245,7 +245,7 @@ public function index(Request $request)
             // 3. Удаляем старые записи о товарах и создаем новые (или обновляем)
             if ($request->has('products')) {
                 // Удаляем старые привязки
-                $visit->visit_infos()->delete();
+                $visit->info()->delete();
 
                 foreach ($request->products as $item) {
                     VisitInfo::create([
@@ -275,7 +275,7 @@ public function index(Request $request)
                 }
             }
 
-            return response()->json(['message' => 'O\'zgartirildi!', 'visit' => $visit->load('visit_infos')]);
+            return response()->json(['message' => 'O\'zgartirildi!', 'visit' => $visit->load('info')]);
         });
     }
 
