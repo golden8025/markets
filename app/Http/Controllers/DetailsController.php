@@ -23,8 +23,7 @@ class DetailsController extends Controller
                 $join->on('products.id', '=', 'product_stocks.product_id')
                     ->where('product_stocks.market_id', '=', $marketId);
             })
-            ->select('products.id', 'products.name', DB::raw('COALESCE(product_stocks.qty, 0) as qty'))
-            .get();
+            ->select('products.id', 'products.name', DB::raw('COALESCE(product_stocks.qty, 0) as qty'))->get();
 
         return response()->json($stocks);
     }
