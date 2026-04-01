@@ -23,56 +23,120 @@ class VisitController extends Controller
 
 
 
+// public function index(Request $request)
+// {
+//     $user = Auth::user();
+//     // 1. Формируем запрос с фильтрами
+//     $visits = Visit::query()
+//         // Важно: подгружаем info.product для расчетов, чтобы не было N+1
+//         ->with(['market.group', 'info.product', 'user'])
+//         ->when($user->role === 'agent', function ($query) use ($user) {
+//             // Если агент — принудительно фильтруем только его визиты
+//             return $query->where('user_id', $user->id);
+//         }, function ($query) use ($request) {
+//             // Если НЕ агент (админ), разрешаем фильтрацию по выбранному user_id из запроса
+//             return $query->when($request->user_id, function ($q, $userId) {
+//                 $q->where('user_id', $userId);
+//             });
+//         })
+        
+//         // Фильтр по дате "ОТ"
+//         ->when($request->date_from, function ($query, $date) {
+//             $query->whereDate('created_at', '>=', $date);
+//         })
+//         // Фильтр по дате "ДО"
+//         ->when($request->date_to, function ($query, $date) {
+//             $query->whereDate('created_at', '<=', $date);
+//         })
+//         // Фильтр по пользователю
+//         ->when($request->user_id, function ($query, $userId) {
+//             $query->where('user_id', $userId);
+//         })
+//         // Фильтр по магазину
+//         ->when($request->market_id, function ($query, $marketId) {
+//             $query->where('market_id', $marketId);
+//         })
+//         // Фильтр по группе магазинов
+//         ->when($request->group_id, function ($query, $groupId) {
+//         $query->whereHas('market', function ($q) use ($groupId) {
+//         $q->where('group_id', $groupId);
+//     });
+//         })
+//         ->orderBy('created_at', 'desc')
+//         ->get();
+
+//     // 2. Трансформируем результат (ваша логика расчетов)
+//     $data = $visits->map(function ($visit) {
+//         $totals = $visit->info->reduce(function ($carry, $info) {
+//             $sold = $info->loaded - $info->left;
+//             $expected = $sold * ($info->product->price ?? 0);
+            
+//             // Считаем "минус"
+//             $minus = max(0, $expected - $info->profit);
+
+//             $carry['sold'] += $sold;
+//             $carry['profit'] += $info->profit;
+//             $carry['minus'] += $minus;
+            
+//             return $carry;
+//         }, ['sold' => 0, 'profit' => 0, 'minus' => 0]);
+
+//         return [
+//             'id'             => $visit->id,
+//             'market_name'    => $visit->market->name ?? 'Н/Д',
+//             'visit_time'     => $visit->created_at->format('d.m.Y H:i'),
+//             'total_sold'     => $totals['sold'],
+//             'total_profit'   => $totals['profit'],
+//             'total_minus'    => $totals['minus'],
+//             'short_comment'  => Str::words($visit->comment, 3, '...'),
+//         ];
+//     });
+
+//     return response()->json($data);
+// }
+
 public function index(Request $request)
 {
     $user = Auth::user();
-    // 1. Формируем запрос с фильтрами
-    $visits = Visit::query()
-        // Важно: подгружаем info.product для расчетов, чтобы не было N+1
-        ->with(['market.group', 'info.product', 'user'])
+
+    $data = Visit::query()
+        // Используем select для ограничения выбираемых колонок (экономия памяти)
+        ->select('id', 'market_id', 'user_id', 'created_at', 'comment')
+        // Eager loading только необходимых полей из связей
+        ->with([
+            'market:id,name,group_id', 
+            'market.group:id,name', 
+            'info:id,visit_id,product_id,loaded,left,profit', 
+            'info.product:id,price', 
+            'user:id,name'
+        ])
+        // Объединяем логику прав доступа и фильтрации пользователей
         ->when($user->role === 'agent', function ($query) use ($user) {
-            // Если агент — принудительно фильтруем только его визиты
-            return $query->where('user_id', $user->id);
+            $query->where('user_id', $user->id);
         }, function ($query) use ($request) {
-            // Если НЕ агент (админ), разрешаем фильтрацию по выбранному user_id из запроса
-            return $query->when($request->user_id, function ($q, $userId) {
-                $q->where('user_id', $userId);
-            });
+            $query->when($request->user_id, fn($q, $id) => $q->where('user_id', $id));
         })
-        
-        // Фильтр по дате "ОТ"
-        ->when($request->date_from, function ($query, $date) {
-            $query->whereDate('created_at', '>=', $date);
-        })
-        // Фильтр по дате "ДО"
-        ->when($request->date_to, function ($query, $date) {
-            $query->whereDate('created_at', '<=', $date);
-        })
-        // Фильтр по пользователю
-        ->when($request->user_id, function ($query, $userId) {
-            $query->where('user_id', $userId);
-        })
+        // Фильтры по датам
+        ->when($request->date_from, fn($q, $date) => $q->whereDate('created_at', '>=', $date))
+        ->when($request->date_to, fn($q, $date) => $q->whereDate('created_at', '<=', $date))
         // Фильтр по магазину
-        ->when($request->market_id, function ($query, $marketId) {
-            $query->where('market_id', $marketId);
-        })
-        // Фильтр по группе магазинов
+        ->when($request->market_id, fn($q, $id) => $q->where('market_id', $id))
+        // Фильтр по группе (оптимизируем через whereIn, если это возможно, но whereHas тоже ок)
         ->when($request->group_id, function ($query, $groupId) {
-        $query->whereHas('market', function ($q) use ($groupId) {
-        $q->where('group_id', $groupId);
-    });
+            $query->whereHas('market', fn($q) => $q->where('group_id', $groupId));
         })
         ->orderBy('created_at', 'desc')
-        ->get();
+        // Рекомендую использовать paginate(20) вместо get() для мобильного приложения
+        ->paginate($request->per_page ?? 20);
 
-    // 2. Трансформируем результат (ваша логика расчетов)
-    $data = $visits->map(function ($visit) {
+    // Трансформируем коллекцию (в пагинации данные лежат в items())
+    $transformedItems = $data->getCollection()->map(function ($visit) {
         $totals = $visit->info->reduce(function ($carry, $info) {
             $sold = $info->loaded - $info->left;
-            $expected = $sold * ($info->product->price ?? 0);
+            $price = $info->product->price ?? 0;
             
-            // Считаем "минус"
-            $minus = max(0, $expected - $info->profit);
+            // Расчет "минуса"
+            $minus = max(0, ($sold * $price) - $info->profit);
 
             $carry['sold'] += $sold;
             $carry['profit'] += $info->profit;
@@ -85,12 +149,16 @@ public function index(Request $request)
             'id'             => $visit->id,
             'market_name'    => $visit->market->name ?? 'Н/Д',
             'visit_time'     => $visit->created_at->format('d.m.Y H:i'),
-            'total_sold'     => $totals['sold'],
-            'total_profit'   => $totals['profit'],
-            'total_minus'    => $totals['minus'],
+            'total_sold'     => (int)$totals['sold'],
+            'total_profit'   => (int)$totals['profit'],
+            'total_minus'    => (int)$totals['minus'],
             'short_comment'  => Str::words($visit->comment, 3, '...'),
+            'user_name'      => $visit->user->name ?? '',
         ];
     });
+
+    // Заменяем коллекцию в объекте пагинации на трансформированную
+    $data->setCollection($transformedItems);
 
     return response()->json($data);
 }
@@ -106,10 +174,11 @@ public function index(Request $request)
 
     public function store(StoreVisitRequest $request)
     {
+        // $id = Auth::user()->id;
         return DB::transaction(function () use ($request) {
             
             $visit = Visit::create([
-                'user_id'   => auth()->id(), 
+                'user_id'   => Auth::user()->id, //auth()->id(), 
                 'market_id' => $request->market_id,
                 'comment'   => $request->comment,
             ]);

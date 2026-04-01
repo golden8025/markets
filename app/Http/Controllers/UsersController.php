@@ -204,7 +204,7 @@ class UsersController extends Controller
 // 2-3 xil tovar bulsa uni xissoblab bulmaydi minusini;
 public function group_markets2()
 {
-    $user = auth()->user();
+    $user = Auth::user(); //auth()->user();
 
     $groups = Group::query()
         ->whereHas('markets', function ($q) use ($user) {
