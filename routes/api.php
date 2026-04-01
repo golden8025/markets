@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/visits/update/{id}', [VisitController::class, 'update']);
     Route::post('/visits', [VisitController::class, 'store']);
     Route::get('/visits/{id}', [VisitController::class, 'show']);
+    Route::delete('/visits/{id}', [VisitController::class, 'destroy']);
 
 
 

@@ -13,6 +13,7 @@ use App\Models\Group;
 use App\Models\Market;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 
@@ -282,8 +283,14 @@ public function index(Request $request)
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        //
+        $visit = Visit::findOrFail($id);
+        // Очистка файлов с диска (если нужно)
+        foreach($visit->images as $img) {
+            Storage::disk('public')->delete($img->image);
+        }
+        $visit->delete(); // Связи удалятся каскадом, если прописано в миграции
+        return response()->json(['message' => 'Deleted']);
     }
 }
