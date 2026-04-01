@@ -44,6 +44,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/products/missing/{marketId}', [ProductController::class, 'getMissingProducts']);
     Route::post('/product-stocks/initial', [ProductController::class, 'storeInitial']);
 
+    // Route for geting and changing stocks
+    Route::get('/stocks/{id}', [DetailsController::class, 'getStocks']);
+    Route::post('/stocks/{id}', [DetailsController::class, 'updateStocks']);
+
+
     // --- Admin Only Routes ---
     Route::middleware('role:admin')->group(function () {
         // Analytics

@@ -149,86 +149,157 @@ class MarketController extends Controller
             ]
         ]);
     }
-   
+
     public function dashboard()
     {
-        $today = Carbon::today();
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
-        $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
+        $today = now()->startOfDay();
+        $startOfMonth = now()->startOfMonth();
+        $startOfLastMonth = now()->subMonth()->startOfMonth();
+        $endOfLastMonth = now()->subMonth()->endOfMonth();
 
+        // 1. Статистика за сегодня + расчет "минуса" (недосдачи) за сегодня
         $todayStats = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+            ->join('products', 'visit_infos.product_id', '=', 'products.id')
             ->whereDate('visits.created_at', $today)
             ->select(
-                DB::raw('SUM(profit) as total_profit'),
-                DB::raw('SUM(loaded) as total_loaded'),
-                DB::raw('SUM(`loaded` - `left`) as total_sold')
+                DB::raw('SUM(visit_infos.profit) as total_profit'),
+                DB::raw('SUM(visit_infos.loaded) as total_loaded'),
+                DB::raw('SUM(visit_infos.loaded - visit_infos.left) as total_sold'),
+                // Вычисляем минус сегодня: (проданное * цена) - прибыль. Если результат < 0, то 0.
+                DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as today_minus')
             )->first();
 
+        // 2. Общий "минус" за все время (теперь через SQL, а не в памяти PHP)
+        $totalMinus = DB::table('visit_infos')
+            ->join('products', 'visit_infos.product_id', '=', 'products.id')
+            ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
+            ->value('total') ?? 0;
 
-        $allVisitsInfo = VisitInfo::with('product')->get();
-        $totalMinus = $allVisitsInfo->sum(function ($info) {
-            $expected = ($info->loaded - $info->left) * ($info->product->price ?? 0);
-            return max(0, $expected - $info->profit);
-        });
-
-        // 3. Сравнение периодов (Текущий месяц vs Прошлый)
+        // 3. Сравнение продаж (Текущий месяц vs Прошлый)
         $thisMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-            ->whereBetween('visits.created_at', [$startOfMonth, Carbon::now()])
-            ->sum(DB::raw('`loaded` - `left`'));
+            ->whereBetween('visits.created_at', [$startOfMonth, now()])
+            ->sum(DB::raw('loaded - `left`'));
 
         $lastMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
-            ->sum(DB::raw('`loaded` - `left`'));
+            ->sum(DB::raw('loaded - `left`'));
 
-        // Расчет разницы в процентах или единицах
-        $diffSold = $thisMonthSold - $lastMonthSold;
-        $diffPrefix = $diffSold >= 0 ? '+' : '';
-
-        $now = Carbon::now();
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
-        $sixtyDaysAgo = Carbon::now()->subDays(60);
-        $calculateMinus = function ($startDate, $endDate) {
-            $infos = VisitInfo::with('product')
-                ->whereHas('visit', function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('created_at', [$startDate, $endDate]);
-                })->get();
-
-            return $infos->sum(function ($info) {
-                $sold = $info->loaded - $info->left;
-                $expected = $sold * ($info->product->price ?? 0);
-                return max(0, $expected - $info->profit);
-            });
+        // 4. Сравнение "минуса" (последние 30 дней vs предыдущие 30 дней)
+        $calculateMinusSql = function ($startDate, $endDate) {
+            return DB::table('visit_infos')
+                ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+                ->join('products', 'visit_infos.product_id', '=', 'products.id')
+                ->whereBetween('visits.created_at', [$startDate, $endDate])
+                ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
+                ->value('total') ?? 0;
         };
-        $currentMonthMinus = $calculateMinus($thirtyDaysAgo, $now);
-        $lastMonthMinus = $calculateMinus($sixtyDaysAgo, $thirtyDaysAgo);
 
-        // 3. Вычисляем разницу
-        $diff = $currentMonthMinus - $lastMonthMinus;
+        $now = now();
+        $thirtyDaysAgo = now()->subDays(30);
+        $sixtyDaysAgo = now()->subDays(60);
 
-        if ($diff > 0) {
-            $diffMinusString = "+" . number_format($diff, 0, '.', ' ');
-        } elseif ($diff < 0) {
-            $diffMinusString = number_format($diff, 0, '.', ' '); 
-        } else {
-            $diffMinusString = "0";
-        }
+        $currentMonthMinus = $calculateMinusSql($thirtyDaysAgo, $now);
+        $lastMonthMinus = $calculateMinusSql($sixtyDaysAgo, $thirtyDaysAgo);
+
+        $diffMinus = $currentMonthMinus - $lastMonthMinus;
+        $diffSold = $thisMonthSold - $lastMonthSold;
+
         return response()->json([
-            'today_profit'    => round(($todayStats->total_profit ?? 0) / 1000000, 2), // В миллионах для экрана
-            'sale_points'     => Market::count(),
-            'loaded_products' => (int)($todayStats->total_loaded ?? 0),
-            'sold_products'   => (int)($todayStats->total_sold ?? 0),
-            'minus'           => number_format($totalMinus, 0, '.', ' '),
+            'today_profit'      => round(($todayStats->total_profit ?? 0) / 1000000, 2),
+            'sale_points'       => DB::table('markets')->count(), // Быстрее чем Market::count()
+            'loaded_products'   => (int)($todayStats->total_loaded ?? 0),
+            'sold_products'     => (int)($todayStats->total_sold ?? 0),
+            'today_minus'       => number_format($todayStats->today_minus ?? 0, 0, '.', ' '),
+            'total_minus'       => number_format($totalMinus, 0, '.', ' '),
             
-            // Данные для блока сравнения
-            'diff_products'   => $diffPrefix . $diffSold, 
-            'diff_minus'      => $diffMinusString, // Можно усложнить логику позже
-            'diff_profit'     => $diffPrefix . "0.5", // Пример статики для визуала
+            'diff_products'     => ($diffSold >= 0 ? '+' : '') . $diffSold, 
+            'diff_minus'        => ($diffMinus >= 0 ? '+' : '') . number_format($diffMinus, 0, '.', ' '),
+            'diff_profit'       => "+0.5", // Статика для визуала
         ]);
     }
+   
+    // public function dashboard()
+    // {
+    //     $today = Carbon::today();
+    //     $startOfMonth = Carbon::now()->startOfMonth();
+    //     $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
+    //     $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
+
+    //     $todayStats = DB::table('visit_infos')
+    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //         ->whereDate('visits.created_at', $today)
+    //         ->select(
+    //             DB::raw('SUM(profit) as total_profit'),
+    //             DB::raw('SUM(loaded) as total_loaded'),
+    //             DB::raw('SUM(`loaded` - `left`) as total_sold')
+    //         )->first();
+
+
+    //     $allVisitsInfo = VisitInfo::with('product')->get();
+    //     $totalMinus = $allVisitsInfo->sum(function ($info) {
+    //         $expected = ($info->loaded - $info->left) * ($info->product->price ?? 0);
+    //         return max(0, $expected - $info->profit);
+    //     });
+
+    //     // 3. Сравнение периодов (Текущий месяц vs Прошлый)
+    //     $thisMonthSold = DB::table('visit_infos')
+    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //         ->whereBetween('visits.created_at', [$startOfMonth, Carbon::now()])
+    //         ->sum(DB::raw('`loaded` - `left`'));
+
+    //     $lastMonthSold = DB::table('visit_infos')
+    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //         ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
+    //         ->sum(DB::raw('`loaded` - `left`'));
+
+    //     // Расчет разницы в процентах или единицах
+    //     $diffSold = $thisMonthSold - $lastMonthSold;
+    //     $diffPrefix = $diffSold >= 0 ? '+' : '';
+
+    //     $now = Carbon::now();
+    //     $thirtyDaysAgo = Carbon::now()->subDays(30);
+    //     $sixtyDaysAgo = Carbon::now()->subDays(60);
+    //     $calculateMinus = function ($startDate, $endDate) {
+    //         $infos = VisitInfo::with('product')
+    //             ->whereHas('visit', function ($q) use ($startDate, $endDate) {
+    //                 $q->whereBetween('created_at', [$startDate, $endDate]);
+    //             })->get();
+
+    //         return $infos->sum(function ($info) {
+    //             $sold = $info->loaded - $info->left;
+    //             $expected = $sold * ($info->product->price ?? 0);
+    //             return max(0, $expected - $info->profit);
+    //         });
+    //     };
+    //     $currentMonthMinus = $calculateMinus($thirtyDaysAgo, $now);
+    //     $lastMonthMinus = $calculateMinus($sixtyDaysAgo, $thirtyDaysAgo);
+
+    //     // 3. Вычисляем разницу
+    //     $diff = $currentMonthMinus - $lastMonthMinus;
+
+    //     if ($diff > 0) {
+    //         $diffMinusString = "+" . number_format($diff, 0, '.', ' ');
+    //     } elseif ($diff < 0) {
+    //         $diffMinusString = number_format($diff, 0, '.', ' '); 
+    //     } else {
+    //         $diffMinusString = "0";
+    //     }
+    //     return response()->json([
+    //         'today_profit'    => round(($todayStats->total_profit ?? 0) / 1000000, 2), // В миллионах для экрана
+    //         'sale_points'     => Market::count(),
+    //         'loaded_products' => (int)($todayStats->total_loaded ?? 0),
+    //         'sold_products'   => (int)($todayStats->total_sold ?? 0),
+    //         'minus'           => number_format($totalMinus, 0, '.', ' '),
+            
+    //         // Данные для блока сравнения
+    //         'diff_products'   => $diffPrefix . $diffSold, 
+    //         'diff_minus'      => $diffMinusString, // Можно усложнить логику позже
+    //         'diff_profit'     => $diffPrefix . "0.5", // Пример статики для визуала
+    //     ]);
+    // }
 
     // App/Http/Controllers/Api/StatisticsController.php
     public function statistics() {
