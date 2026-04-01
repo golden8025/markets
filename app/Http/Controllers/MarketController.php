@@ -302,40 +302,87 @@ class MarketController extends Controller
     // }
 
     // App/Http/Controllers/Api/StatisticsController.php
+    // public function statistics() {
+    //     $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha']; // Порядок зависит от настроек недели
+    //     $weeklyData = [];
+
+    //     // Собираем данные за последние 7 дней
+    //     for ($i = 6; $i >= 0; $i--) {
+    //         $date = Carbon::now()->subDays($i);
+    //         $dayName = $days[$date->dayOfWeek];
+
+    //         $stats = DB::table('visit_infos')
+    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //             ->whereDate('visits.created_at', $date)
+    //             ->select(
+    //                 DB::raw('SUM(`loaded` - `left`) as sales'),
+    //                 DB::raw('SUM(profit) as income')
+    //             )->first();
+
+    //         $weeklyData[] = [
+    //             'day' => $dayName,
+    //             'sales' => (int)($stats->sales ?? 0),
+    //             'income' => (int)($stats->income ?? 0),
+    //         ];
+    //     }
+
+    //     $totalVisits = Visit::where('created_at', '>=', Carbon::now()->subDays(7))->count();
+    //     $totalIncome = collect($weeklyData)->sum('income');
+    //     $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
+
+    //     return response()->json([
+    //         'weekly_data' => $weeklyData,
+    //         'total_visits' => $totalVisits,
+    //         'avg_income' => round($avgIncome, 2)
+    //     ]);
+    // }
+
     public function statistics() {
-        $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha']; // Порядок зависит от настроек недели
-        $weeklyData = [];
+    $daysNames = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha'];
+    $startDate = now()->subDays(6)->startOfDay();
+    
+    // Один запрос для получения всех данных за неделю
+    $statsData = DB::table('visit_infos')
+        ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+        ->where('visits.created_at', '>=', $startDate)
+        ->select(
+            DB::raw('DATE(visits.created_at) as date'),
+            DB::raw('SUM(`loaded` - `left`) as sales'),
+            DB::raw('SUM(profit) as income')
+        )
+        ->groupBy('date')
+        ->get()
+        ->keyBy('date'); // Группируем по дате для удобного поиска
 
-        // Собираем данные за последние 7 дней
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
-            $dayName = $days[$date->dayOfWeek];
+    $weeklyData = [];
+    $totalIncome = 0;
 
-            $stats = DB::table('visit_infos')
-                ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-                ->whereDate('visits.created_at', $date)
-                ->select(
-                    DB::raw('SUM(`loaded` - `left`) as sales'),
-                    DB::raw('SUM(profit) as income')
-                )->first();
+    // Формируем массив, гарантируя наличие всех 7 дней (даже если продаж не было)
+    for ($i = 6; $i >= 0; $i--) {
+        $dateObj = now()->subDays($i);
+        $dateString = $dateObj->toDateString();
+        
+        $dayStats = $statsData->get($dateString);
+        
+        $income = (int)($dayStats->income ?? 0);
+        $totalIncome += $income;
 
-            $weeklyData[] = [
-                'day' => $dayName,
-                'sales' => (int)($stats->sales ?? 0),
-                'income' => (int)($stats->income ?? 0),
-            ];
-        }
-
-        $totalVisits = Visit::where('created_at', '>=', Carbon::now()->subDays(7))->count();
-        $totalIncome = collect($weeklyData)->sum('income');
-        $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
-
-        return response()->json([
-            'weekly_data' => $weeklyData,
-            'total_visits' => $totalVisits,
-            'avg_income' => round($avgIncome, 2)
-        ]);
+        $weeklyData[] = [
+            'day' => $daysNames[$dateObj->dayOfWeek],
+            'sales' => (int)($dayStats->sales ?? 0),
+            'income' => $income,
+        ];
     }
+
+    $totalVisits = Visit::where('created_at', '>=', $startDate)->count();
+    $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
+
+    return response()->json([
+        'weekly_data' => $weeklyData,
+        'total_visits' => $totalVisits,
+        'avg_income' => round($avgIncome, 2)
+    ]);
+}
    
     public function update(Request $request, string $id)
     {
