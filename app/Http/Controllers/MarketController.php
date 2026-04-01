@@ -212,7 +212,7 @@ class MarketController extends Controller
         if ($diff > 0) {
             $diffMinusString = "+" . number_format($diff, 0, '.', ' ');
         } elseif ($diff < 0) {
-            $diffMinusString = number_format($diff, 0, '.', ' '); // минус уже будет в числе
+            $diffMinusString = number_format($diff, 0, '.', ' '); 
         } else {
             $diffMinusString = "0";
         }

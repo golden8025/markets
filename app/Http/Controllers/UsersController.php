@@ -201,7 +201,7 @@ class UsersController extends Controller
 
 //     return response()->json($groups);
 // }
-
+// 2-3 xil tovar bulsa uni xissoblab bulmaydi minusini;
 public function group_markets2()
 {
     $user = auth()->user();
@@ -240,15 +240,26 @@ public function group_markets2()
                     return $soldQty * ($detail->product->price ?? 0);
                 });
 
+                
+                
+
                 $market->last_debt = (int) ($expectedCash - $market->last_profit);
                 
                 // 3. Общее количество проданного товара
                 $market->last_sold_qty = (int) ($lastVisit->info->sum('loaded') - $lastVisit->info->sum('left'));
+                $firstProduct = $lastVisit->info->first()->product ?? null;
+
+                if ($firstProduct && $firstProduct->price > 0) {
+                    $market->last_minus_qty = (int) ($market->last_debt / $firstProduct->price);
+                } else {
+                    $market->last_minus_qty = 0;
+                }
             } else {
                 // Если визитов еще не было
                 $market->last_profit = 0;
                 $market->last_debt = 0;
                 $market->last_sold_qty = 0;
+                $market->last_minus_qty = 0;
             }
 
             // Очищаем JSON от лишних данных, чтобы Flutter было легче парсить

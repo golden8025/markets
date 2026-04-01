@@ -280,17 +280,13 @@ public function index(Request $request)
         });
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy($id)
     {
         $visit = Visit::findOrFail($id);
-        // Очистка файлов с диска (если нужно)
         foreach($visit->images as $img) {
             Storage::disk('public')->delete($img->image);
         }
-        $visit->delete(); // Связи удалятся каскадом, если прописано в миграции
+        $visit->delete();
         return response()->json(['message' => 'Deleted']);
     }
 }
