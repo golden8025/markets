@@ -227,48 +227,100 @@ public function index(Request $request)
     /**
      * Display the specified resource.
      */
+    // public function show(string $id)
+    // {
+    //     // Загружаем визит со всеми вложенными связями
+    //     $visit = Visit::with(['market', 'info.product', 'images'])->findOrFail($id);
+
+    //     $report = $visit->info->map(function ($info) {
+    //         // 1. Считаем сколько реально продано штук
+    //         $soldCount = $info->loaded - $info->left;
+            
+    //         // 2. Ожидаемая сумма по прайсу
+    //         $expectedAmount = $soldCount * ($info->product->price ?? 0);
+            
+    //         // 3. Расчет "минуса" (недостачи)
+    //         // Если прибыль больше ожидаемого, минус будет 0
+    //         $minus = max(0, $expectedAmount - $info->profit);
+
+    //         return [
+    //             'product_id'   => $info->product_id,
+    //             'product_name' => $info->product->name ?? 'Удаленный товар',
+    //             'price'        => $info->product->price,
+    //             'loaded'       => $info->loaded,
+    //             'left'         => $info->left,
+    //             'sold'         => $soldCount,
+    //             'profit'       => $info->profit,
+    //             'minus'        => $minus, 
+    //         ];
+    //     });
+
+    //     return response()->json([
+    //         'market_name'    => $visit->market->name ?? 'Неизвестно',
+    //         'visit_date'     => $visit->created_at->format('d.m.Y H:i'),
+    //         'comment'        => $visit->comment,
+    //         'photos'         => $visit->images->pluck('image')->map(fn($img) => asset('storage/' . $img)),
+            
+    //         'products_data'  => $report,
+            
+    //         // Итоговые показатели по всему визиту
+    //         'total_profit'   => $report->sum('profit'),
+    //         'total_minus'    => $report->sum('minus'), // Общий минус за весь визит
+    //     ]);
+    // }
+
     public function show(string $id)
     {
-        // Загружаем визит со всеми вложенными связями
-        $visit = Visit::with(['market', 'info.product', 'images'])->findOrFail($id);
+        // 1. Загружаем визит. Ограничиваем выборку полей для скорости.
+        $visit = Visit::with([
+            'market:id,name', 
+            'info:id,visit_id,product_id,loaded,left,profit', 
+            'info.product:id,name,price', // Берем цену, если нет исторической в visit_infos
+            'images:id,visit_id,image'
+        ])->findOrFail($id);
 
         $report = $visit->info->map(function ($info) {
-            // 1. Считаем сколько реально продано штук
             $soldCount = $info->loaded - $info->left;
             
-            // 2. Ожидаемая сумма по прайсу
-            $expectedAmount = $soldCount * ($info->product->price ?? 0);
+            // ВНИМАНИЕ: Если у тебя в таблице visit_infos есть колонка price_at_time, 
+            // лучше использовать её: $price = $info->price_at_time ?? $info->product->price;
+            $price = $info->product->price ?? 0;
             
-            // 3. Расчет "минуса" (недостачи)
-            // Если прибыль больше ожидаемого, минус будет 0
+            $expectedAmount = $soldCount * $price;
+            
+            // Логика "Минуса" (недостачи)
             $minus = max(0, $expectedAmount - $info->profit);
 
             return [
                 'product_id'   => $info->product_id,
-                'product_name' => $info->product->name ?? 'Удаленный товар',
-                'price'        => $info->product->price,
-                'loaded'       => $info->loaded,
-                'left'         => $info->left,
-                'sold'         => $soldCount,
-                'profit'       => $info->profit,
-                'minus'        => $minus, 
+                'product_name' => $info->product->name ?? 'O‘chirilgan mahsulot',
+                'price'        => (int)$price,
+                'loaded'       => (int)$info->loaded,
+                'left'         => (int)$info->left,
+                'sold'         => (int)$soldCount,
+                'profit'       => (int)$info->profit,
+                'minus'        => (int)$minus, 
             ];
         });
 
         return response()->json([
-            'market_name'    => $visit->market->name ?? 'Неизвестно',
+            'id'             => $visit->id,
+            'market_name'    => $visit->market->name ?? 'Noma’lum',
             'visit_date'     => $visit->created_at->format('d.m.Y H:i'),
-            'comment'        => $visit->comment,
-            'photos'         => $visit->images->pluck('image')->map(fn($img) => asset('storage/' . $img)),
+            'comment'        => $visit->comment ?? '',
+            // Правильное формирование ссылок на фото через Storage
+            'photos'         => $visit->images->map(function($img) {
+                return asset('storage/' . $img->image);
+            }),
             
             'products_data'  => $report,
             
-            // Итоговые показатели по всему визиту
-            'total_profit'   => $report->sum('profit'),
-            'total_minus'    => $report->sum('minus'), // Общий минус за весь визит
+            // Итоговые показатели (считаем из трансформированного отчета)
+            'total_sold'     => (int)$report->sum('sold'),
+            'total_profit'   => (int)$report->sum('profit'),
+            'total_minus'    => (int)$report->sum('minus'),
         ]);
     }
-
 
 
     public function edit($id)
