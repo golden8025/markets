@@ -271,32 +271,37 @@ public function index(Request $request)
 
     public function show(string $id)
     {
-        // 1. Загружаем визит. Ограничиваем выборку полей для скорости.
         $visit = Visit::with([
-            'market:id,name', 
-            'info:id,visit_id,product_id,loaded,left,profit', 
-            'info.product:id,name,price', // Берем цену, если нет исторической в visit_infos
-            'images:id,visit_id,image'
+            'market.stocks', // Загружаем текущие остатки магазина
+            'info.product',
+            'images'
         ])->findOrFail($id);
 
-        $report = $visit->info->map(function ($info) {
-            $soldCount = $info->loaded - $info->left;
+        $report = $visit->info->map(function ($info) use ($visit) {
+            // Находим, сколько этого товара было в магазине (из таблицы product_stocks)
+            $stock = $visit->market->stocks
+                ->where('product_id', $info->product_id)
+                ->first();
             
-            // ВНИМАНИЕ: Если у тебя в таблице visit_infos есть колонка price_at_time, 
-            // лучше использовать её: $price = $info->price_at_time ?? $info->product->price;
+            $currentStockQty = $stock->qty ?? 0;
+
+            // 1. Расчет реальных продаж: (Что было + Что привезли) - Что осталось
+            $totalAvailable = $currentStockQty + $info->loaded;
+            $soldCount = max(0, $totalAvailable - $info->left);
+            
             $price = $info->product->price ?? 0;
-            
             $expectedAmount = $soldCount * $price;
             
-            // Логика "Минуса" (недостачи)
+            // 2. Расчет "минуса"
             $minus = max(0, $expectedAmount - $info->profit);
 
             return [
                 'product_id'   => $info->product_id,
-                'product_name' => $info->product->name ?? 'O‘chirilgan mahsulot',
+                'product_name' => $info->product->name ?? 'Noma’lum',
                 'price'        => (int)$price,
-                'loaded'       => (int)$info->loaded,
-                'left'         => (int)$info->left,
+                'was_in_stock' => (int)$currentStockQty, // Было в магазине
+                'loaded'       => (int)$info->loaded,       // Привезли сегодня
+                'left'         => (int)$info->left,         // Осталось после визита
                 'sold'         => (int)$soldCount,
                 'profit'       => (int)$info->profit,
                 'minus'        => (int)$minus, 
@@ -305,17 +310,11 @@ public function index(Request $request)
 
         return response()->json([
             'id'             => $visit->id,
-            'market_name'    => $visit->market->name ?? 'Noma’lum',
+            'market_name'    => $visit->market->name ?? 'N/A',
             'visit_date'     => $visit->created_at->format('d.m.Y H:i'),
-            'comment'        => $visit->comment ?? '',
-            // Правильное формирование ссылок на фото через Storage
-            'photos'         => $visit->images->map(function($img) {
-                return asset('storage/' . $img->image);
-            }),
-            
+            'comment'        => $visit->comment,
+            'photos'         => $visit->images->map(fn($img) => asset('storage/' . $img->image)),
             'products_data'  => $report,
-            
-            // Итоговые показатели (считаем из трансформированного отчета)
             'total_sold'     => (int)$report->sum('sold'),
             'total_profit'   => (int)$report->sum('profit'),
             'total_minus'    => (int)$report->sum('minus'),
