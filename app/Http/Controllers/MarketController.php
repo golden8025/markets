@@ -153,6 +153,77 @@ class MarketController extends Controller
         ]);
     }
 
+    // public function dashboard()
+    // {
+    //     $today = now()->startOfDay();
+    //     $startOfMonth = now()->startOfMonth();
+    //     $startOfLastMonth = now()->subMonth()->startOfMonth();
+    //     $endOfLastMonth = now()->subMonth()->endOfMonth();
+
+    //     // 1. Статистика за сегодня + расчет "минуса" (недосдачи) за сегодня
+    //     $todayStats = DB::table('visit_infos')
+    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //         ->join('products', 'visit_infos.product_id', '=', 'products.id')
+    //         ->whereDate('visits.created_at', $today)
+    //         ->select(
+    //             DB::raw('SUM(visit_infos.profit) as total_profit'),
+    //             DB::raw('SUM(visit_infos.loaded) as total_loaded'),
+    //             DB::raw('SUM(visit_infos.loaded - visit_infos.left) as total_sold'),
+    //             // Вычисляем минус сегодня: (проданное * цена) - прибыль. Если результат < 0, то 0.
+    //             DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as today_minus')
+    //         )->first();
+
+    //     // 2. Общий "минус" за все время (теперь через SQL, а не в памяти PHP)
+    //     $totalMinus = DB::table('visit_infos')
+    //         ->join('products', 'visit_infos.product_id', '=', 'products.id')
+    //         ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
+    //         ->value('total') ?? 0;
+
+    //     // 3. Сравнение продаж (Текущий месяц vs Прошлый)
+    //     $thisMonthSold = DB::table('visit_infos')
+    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //         ->whereBetween('visits.created_at', [$startOfMonth, now()])
+    //         ->sum(DB::raw('loaded - `left`'));
+
+    //     $lastMonthSold = DB::table('visit_infos')
+    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //         ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
+    //         ->sum(DB::raw('loaded - `left`'));
+
+    //     // 4. Сравнение "минуса" (последние 30 дней vs предыдущие 30 дней)
+    //     $calculateMinusSql = function ($startDate, $endDate) {
+    //         return DB::table('visit_infos')
+    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //             ->join('products', 'visit_infos.product_id', '=', 'products.id')
+    //             ->whereBetween('visits.created_at', [$startDate, $endDate])
+    //             ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
+    //             ->value('total') ?? 0;
+    //     };
+
+    //     $now = now();
+    //     $thirtyDaysAgo = now()->subDays(30);
+    //     $sixtyDaysAgo = now()->subDays(60);
+
+    //     $currentMonthMinus = $calculateMinusSql($thirtyDaysAgo, $now);
+    //     $lastMonthMinus = $calculateMinusSql($sixtyDaysAgo, $thirtyDaysAgo);
+
+    //     $diffMinus = $currentMonthMinus - $lastMonthMinus;
+    //     $diffSold = $thisMonthSold - $lastMonthSold;
+
+    //     return response()->json([
+    //         'today_profit'      => round(($todayStats->total_profit ?? 0) / 1000000, 2),
+    //         'sale_points'       => DB::table('markets')->count(), // Быстрее чем Market::count()
+    //         'loaded_products'   => (int)($todayStats->total_loaded ?? 0),
+    //         'sold_products'     => (int)($todayStats->total_sold ?? 0),
+    //         'today_minus'       => number_format($todayStats->today_minus ?? 0, 0, '.', ' '),
+    //         'total_minus'       => number_format($totalMinus, 0, '.', ' '),
+            
+    //         'diff_products'     => ($diffSold >= 0 ? '+' : '') . $diffSold, 
+    //         'diff_minus'        => ($diffMinus >= 0 ? '+' : '') . number_format($diffMinus, 0, '.', ' '),
+    //         'diff_profit'       => "+0.5", // Статика для визуала
+    //     ]);
+    // }
+
     public function dashboard()
     {
         $today = now()->startOfDay();
@@ -160,7 +231,7 @@ class MarketController extends Controller
         $startOfLastMonth = now()->subMonth()->startOfMonth();
         $endOfLastMonth = now()->subMonth()->endOfMonth();
 
-        // 1. Статистика за сегодня + расчет "минуса" (недосдачи) за сегодня
+        // 1. Статистика за сегодня + расчет "минуса" через новое поле sold
         $todayStats = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->join('products', 'visit_infos.product_id', '=', 'products.id')
@@ -168,27 +239,27 @@ class MarketController extends Controller
             ->select(
                 DB::raw('SUM(visit_infos.profit) as total_profit'),
                 DB::raw('SUM(visit_infos.loaded) as total_loaded'),
-                DB::raw('SUM(visit_infos.loaded - visit_infos.left) as total_sold'),
-                // Вычисляем минус сегодня: (проданное * цена) - прибыль. Если результат < 0, то 0.
-                DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as today_minus')
+                DB::raw('SUM(visit_infos.sold) as total_sold'), // Используем новое поле
+                // Минус: (sold * цена) - прибыль. 
+                DB::raw('SUM(GREATEST(0, (visit_infos.sold * products.price) - visit_infos.profit)) as today_minus')
             )->first();
 
-        // 2. Общий "минус" за все время (теперь через SQL, а не в памяти PHP)
+        // 2. Общий "минус" за все время (упрощенный запрос)
         $totalMinus = DB::table('visit_infos')
             ->join('products', 'visit_infos.product_id', '=', 'products.id')
-            ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
+            ->select(DB::raw('SUM(GREATEST(0, (visit_infos.sold * products.price) - visit_infos.profit)) as total'))
             ->value('total') ?? 0;
 
         // 3. Сравнение продаж (Текущий месяц vs Прошлый)
         $thisMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->whereBetween('visits.created_at', [$startOfMonth, now()])
-            ->sum(DB::raw('loaded - `left`'));
+            ->sum('sold'); // Прямое суммирование по полю
 
         $lastMonthSold = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
-            ->sum(DB::raw('loaded - `left`'));
+            ->sum('sold');
 
         // 4. Сравнение "минуса" (последние 30 дней vs предыдущие 30 дней)
         $calculateMinusSql = function ($startDate, $endDate) {
@@ -196,7 +267,7 @@ class MarketController extends Controller
                 ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
                 ->join('products', 'visit_infos.product_id', '=', 'products.id')
                 ->whereBetween('visits.created_at', [$startDate, $endDate])
-                ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
+                ->select(DB::raw('SUM(GREATEST(0, (visit_infos.sold * products.price) - visit_infos.profit)) as total'))
                 ->value('total') ?? 0;
         };
 
@@ -212,7 +283,7 @@ class MarketController extends Controller
 
         return response()->json([
             'today_profit'      => round(($todayStats->total_profit ?? 0) / 1000000, 2),
-            'sale_points'       => DB::table('markets')->count(), // Быстрее чем Market::count()
+            'sale_points'       => DB::table('markets')->count(),
             'loaded_products'   => (int)($todayStats->total_loaded ?? 0),
             'sold_products'     => (int)($todayStats->total_sold ?? 0),
             'today_minus'       => number_format($todayStats->today_minus ?? 0, 0, '.', ' '),
@@ -220,7 +291,7 @@ class MarketController extends Controller
             
             'diff_products'     => ($diffSold >= 0 ? '+' : '') . $diffSold, 
             'diff_minus'        => ($diffMinus >= 0 ? '+' : '') . number_format($diffMinus, 0, '.', ' '),
-            'diff_profit'       => "+0.5", // Статика для визуала
+            'diff_profit'       => "+0.5", 
         ]);
     }
    
