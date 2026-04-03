@@ -11,7 +11,8 @@ class VisitInfo extends Model
         'visit_id',
         'loaded',
         'left',
-        'profit'
+        'profit',
+        'sold'
     ];
 
     public function product() {

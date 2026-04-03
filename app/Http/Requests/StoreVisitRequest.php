@@ -30,11 +30,11 @@ class StoreVisitRequest extends FormRequest
             'products.*.id'     => 'required|exists:products,id',
             'products.*.loaded' => 'required|integer|min:0',
             'products.*.left'   => 'required|integer|min:0',
-            'products.*.profit' => 'required|integer',
+            'products.*.profit' => 'required|integer|min:0',
 
             // Валидация изображений
             'images'   => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:5120', // макс 5МБ
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:8120', // макс 5МБ
         ];
     }
 

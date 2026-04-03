@@ -62,6 +62,9 @@ class MarketController extends Controller
 
     public function store(StoreMarketRequest $request)
     {
+        if (!Auth::user()?->permission) {
+            return response()->json(['message' => 'Sizda xuquq yoq'], 403);
+        }
         // 1. Создаем маркет
         $market = Market::create($request->validated());
 
@@ -303,40 +306,92 @@ class MarketController extends Controller
 
     // App/Http/Controllers/Api/StatisticsController.php
     
-    public function statistics() {
-        $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha']; // Порядок зависит от настроек недели
-        $weeklyData = [];
+    // public function statistics() {
+    //     $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha']; // Порядок зависит от настроек недели
+    //     $weeklyData = [];
 
-        // Собираем данные за последние 7 дней
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
-            $dayName = $days[$date->dayOfWeek];
+    //     // Собираем данные за последние 7 дней
+    //     for ($i = 6; $i >= 0; $i--) {
+    //         $date = Carbon::now()->subDays($i);
+    //         $dayName = $days[$date->dayOfWeek];
 
-            $stats = DB::table('visit_infos')
-                ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-                ->whereDate('visits.created_at', $date)
-                ->select(
-                    DB::raw('SUM(`loaded` - `left`) as sales'),
-                    DB::raw('SUM(profit) as income')
-                )->first();
+    //         $stats = DB::table('visit_infos')
+    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //             ->whereDate('visits.created_at', $date)
+    //             ->select(
+    //                 DB::raw('SUM(`loaded` - `left`) as sales'),
+    //                 DB::raw('SUM(profit) as income')
+    //             )->first();
 
-            $weeklyData[] = [
-                'day' => $dayName,
-                'sales' => (int)($stats->sales ?? 0),
-                'income' => (int)($stats->income ?? 0),
-            ];
-        }
+    //         $weeklyData[] = [
+    //             'day' => $dayName,
+    //             'sales' => (int)($stats->sales ?? 0),
+    //             'income' => (int)($stats->income ?? 0),
+    //         ];
+    //     }
 
-        $totalVisits = Visit::where('created_at', '>=', Carbon::now()->subDays(7))->count();
-        $totalIncome = collect($weeklyData)->sum('income');
-        $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
+    //     $totalVisits = Visit::where('created_at', '>=', Carbon::now()->subDays(7))->count();
+    //     $totalIncome = collect($weeklyData)->sum('income');
+    //     $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
 
-        return response()->json([
-            'weekly_data' => $weeklyData,
-            'total_visits' => $totalVisits,
-            'avg_income' => round($avgIncome, 2)
-        ]);
+    //     return response()->json([
+    //         'weekly_data' => $weeklyData,
+    //         'total_visits' => $totalVisits,
+    //         'avg_income' => (int)(round($avgIncome, 2))
+    //     ]);
+    // }
+
+    public function statistics() 
+{
+    $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha'];
+    $startDate = Carbon::now()->subDays(6)->startOfDay();
+    
+    // 1. Получаем все данные за неделю одним запросом
+    $rawStats = DB::table('visit_infos')
+        ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+        ->where('visits.created_at', '>=', $startDate)
+        ->select(
+            DB::raw('DATE(visits.created_at) as date'),
+            // ТЕПЕРЬ ИСПОЛЬЗУЕМ ПОЛЕ sold
+            DB::raw('SUM(visit_infos.sold) as total_sales'),
+            DB::raw('SUM(visit_infos.profit) as total_income'),
+            DB::raw('COUNT(DISTINCT visits.id) as visits_count')
+        )
+        ->groupBy('date')
+        ->get()
+        ->keyBy('date');
+
+    $weeklyData = [];
+    $totalVisitsCount = 0;
+
+    // 2. Формируем массив для фронтенда, заполняя пустые дни нулями
+    for ($i = 6; $i >= 0; $i--) {
+        $dateObj = Carbon::now()->subDays($i);
+        $dateString = $dateObj->format('Y-m-d');
+        $dayName = $days[$dateObj->dayOfWeek];
+
+        $dayData = $rawStats->get($dateString);
+
+        $weeklyData[] = [
+            'day'    => $dayName,
+            'sales'  => (int)($dayData->total_sales ?? 0),  // Кол-во проданного товара
+            'income' => (int)($dayData->total_income ?? 0), // Полученные деньги
+        ];
+
+        $totalVisitsCount += ($dayData->visits_count ?? 0);
     }
+
+    $totalIncome = collect($weeklyData)->sum('income');
+    
+    // Средний доход на один визит
+    $avgIncome = $totalVisitsCount > 0 ? $totalIncome / $totalVisitsCount : 0;
+
+    return response()->json([
+        'weekly_data'  => $weeklyData,
+        'total_visits' => $totalVisitsCount,
+        'avg_income'   => (int)round($avgIncome),
+    ]);
+}
 
 //     public function statistics() {
 //     $daysNames = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha'];

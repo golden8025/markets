@@ -202,74 +202,148 @@ class UsersController extends Controller
 //     return response()->json($groups);
 // }
 // 2-3 xil tovar bulsa uni xissoblab bulmaydi minusini;
-public function group_markets2()
-{
-    $user = Auth::user(); //auth()->user();
 
-    $groups = Group::query()
-        ->whereHas('markets', function ($q) use ($user) {
-            $q->when($user->role === 'agent', function ($sq) use ($user) {
-                $sq->whereHas('users', fn($u) => $u->where('users.id', $user->id));
-            });
-        })
-        ->with(['markets' => function ($query) use ($user) {
-            // Фильтруем маркеты для агента
-            $query->when($user->role === 'agent', function ($q) use ($user) {
-                $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
-            });
+// public function group_markets2()
+// {
+//     $user = Auth::user(); //auth()->user();
 
-            // ЖАДНАЯ ЗАГРУЗКА (Eager Loading) — это уберет таймаут
-            // Загружаем сумму остатков и последний визит со всеми вложенными данными
-            $query->withSum('stocks as total_qty', 'qty')
-                  ->with(['latestVisit.info.product']); 
-        }])
-        ->get();
+//     $groups = Group::query()
+//         ->whereHas('markets', function ($q) use ($user) {
+//             $q->when($user->role === 'agent', function ($sq) use ($user) {
+//                 $sq->whereHas('users', fn($u) => $u->where('users.id', $user->id));
+//             });
+//         })
+//         ->with(['markets' => function ($query) use ($user) {
+//             // Фильтруем маркеты для агента
+//             $query->when($user->role === 'agent', function ($q) use ($user) {
+//                 $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
+//             });
 
-    $groups->each(function ($group) {
-        foreach ($group->markets as $market) {
-            // Достаем связь, которую мы загрузили через latestOfMany()
-            $lastVisit = $market->latestVisit;
+//             // ЖАДНАЯ ЗАГРУЗКА (Eager Loading) — это уберет таймаут
+//             // Загружаем сумму остатков и последний визит со всеми вложенными данными
+//             $query->withSum('stocks as total_qty', 'qty')
+//                   ->with(['latestVisit.info.product']); 
+//         }])
+//         ->get();
 
-            if ($lastVisit && $lastVisit->info->isNotEmpty()) {
-                // 1. Прибыль берем из коллекции visit_infos (связь info)
-                $market->last_profit = (int) $lastVisit->info->sum('profit');
+//     $groups->each(function ($group) {
+//         foreach ($group->markets as $market) {
+//             // Достаем связь, которую мы загрузили через latestOfMany()
+//             $lastVisit = $market->latestVisit;
 
-                // 2. Считаем дебет (ожидаемые деньги - реальные деньги)
-                $expectedCash = $lastVisit->info->sum(function ($detail) {
-                    $soldQty = $detail->loaded - $detail->left;
-                    return $soldQty * ($detail->product->price ?? 0);
+//             if ($lastVisit && $lastVisit->info->isNotEmpty()) {
+//                 // 1. Прибыль берем из коллекции visit_infos (связь info)
+//                 $market->last_profit = (int) $lastVisit->info->sum('profit');
+
+//                 // 2. Считаем дебет (ожидаемые деньги - реальные деньги)
+//                 $expectedCash = $lastVisit->info->sum(function ($detail) {
+//                     $soldQty = $detail->loaded - $detail->left;
+//                     return $soldQty * ($detail->product->price ?? 0);
+//                 });
+
+                
+                
+
+//                 $market->last_debt = (int) ($expectedCash - $market->last_profit);
+                
+//                 // 3. Общее количество проданного товара
+//                 $market->last_sold_qty = (int) ($lastVisit->info->sum('loaded') - $lastVisit->info->sum('left'));
+//                 $firstProduct = $lastVisit->info->first()->product ?? null;
+
+//                 if ($firstProduct && $firstProduct->price > 0) {
+//                     $market->last_minus_qty = (int) ($market->last_debt / $firstProduct->price);
+//                 } else {
+//                     $market->last_minus_qty = 0;
+//                 }
+//             } else {
+//                 // Если визитов еще не было
+//                 $market->last_profit = 0;
+//                 $market->last_debt = 0;
+//                 $market->last_sold_qty = 0;
+//                 $market->last_minus_qty = 0;
+//             }
+
+//             // Очищаем JSON от лишних данных, чтобы Flutter было легче парсить
+//             $market->total_qty = (int) ($market->total_qty ?? 0);
+//             $market->makeHidden(['latestVisit', 'stocks']);
+//         }
+//     });
+
+//     return response()->json($groups);
+// }
+
+
+    public function group_markets2()
+    {
+        $user = Auth::user();
+
+        $groups = Group::query()
+            ->whereHas('markets', function ($q) use ($user) {
+                $q->when($user->role === 'agent', function ($sq) use ($user) {
+                    $sq->whereHas('users', fn($u) => $u->where('users.id', $user->id));
+                });
+            })
+            ->with(['markets' => function ($query) use ($user) {
+                // Фильтруем маркеты для агента
+                $query->when($user->role === 'agent', function ($q) use ($user) {
+                    $q->whereHas('users', fn($sq) => $sq->where('users.id', $user->id));
                 });
 
-                
-                
+                // Жадная загрузка сумм и последнего визита
+                $query->withSum('stocks as total_qty', 'qty')
+                    ->with(['latestVisit.info.product']); 
+            }])
+            ->get();
 
-                $market->last_debt = (int) ($expectedCash - $market->last_profit);
-                
-                // 3. Общее количество проданного товара
-                $market->last_sold_qty = (int) ($lastVisit->info->sum('loaded') - $lastVisit->info->sum('left'));
-                $firstProduct = $lastVisit->info->first()->product ?? null;
+        $groups->each(function ($group) {
+            foreach ($group->markets as $market) {
+                $lastVisit = $market->latestVisit;
 
-                if ($firstProduct && $firstProduct->price > 0) {
-                    $market->last_minus_qty = (int) ($market->last_debt / $firstProduct->price);
+                if ($lastVisit && $lastVisit->info->isNotEmpty()) {
+                    // 1. Прибыль (касса) за последний визит
+                    $market->last_profit = (int) $lastVisit->info->sum('profit');
+
+                    // 2. Используем новое поле SOLD для расчета дебета (долга в суммах)
+                    $market->last_debt = (int) $lastVisit->info->sum(function ($info) {
+                        $expected = ($info->sold ?? 0) * ($info->product->price ?? 0);
+                        // Долг — это разница между тем, что продано, и тем, что сдано
+                        return max(0, $expected - $info->profit);
+                    });
+
+                    // 3. Общее количество проданного товара (штуки)
+                    $market->last_sold_qty = (int) $lastVisit->info->sum('sold');
+
+                    // 4. "Минус" в штуках (сколько товара не оплачено)
+                    // Теперь считаем точно по каждому товару, а не по "первому попавшемуся"
+                    $market->last_minus_qty = (int) $lastVisit->info->sum(function ($info) {
+                        $price = $info->product->price ?? 0;
+                        if ($price > 0) {
+                            $expected = ($info->sold ?? 0) * $price;
+                            $debt = max(0, $expected - $info->profit);
+                            // Переводим долг по конкретному товару обратно в штуки
+                            return $debt / $price;
+                        }
+                        return 0;
+                    });
+
                 } else {
+                    // Если визитов не было — всё по нулям
+                    $market->last_profit = 0;
+                    $market->last_debt = 0;
+                    $market->last_sold_qty = 0;
                     $market->last_minus_qty = 0;
                 }
-            } else {
-                // Если визитов еще не было
-                $market->last_profit = 0;
-                $market->last_debt = 0;
-                $market->last_sold_qty = 0;
-                $market->last_minus_qty = 0;
+
+                // Приведение типов для Flutter
+                $market->total_qty = (int) ($market->total_qty ?? 0);
+                
+                // Прячем вложенные связи, чтобы не раздувать JSON
+                $market->makeHidden(['latestVisit', 'stocks']);
             }
+        });
 
-            // Очищаем JSON от лишних данных, чтобы Flutter было легче парсить
-            $market->total_qty = (int) ($market->total_qty ?? 0);
-            $market->makeHidden(['latestVisit', 'stocks']);
-        }
-    });
-
-    return response()->json($groups);
-}
+        return response()->json($groups);
+    }
 
     public function syncMarkets(Request $request, $id) {
         $user = User::findOrFail($id);

@@ -43,36 +43,78 @@ class StatController extends Controller
     // }
 
 
+    // public function marketsStatistics()
+    // {
+    //     $thirtyDaysAgo = Carbon::now()->subDays(30);
+
+    //     $markets = Market::all()->map(function ($market) use ($thirtyDaysAgo) {
+    //         $stats = DB::table('visit_infos')
+    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //             ->join('products', 'visit_infos.product_id', '=', 'products.id')
+    //             ->where('visits.market_id', $market->id)
+    //             ->where('visits.created_at', '>=', $thirtyDaysAgo)
+    //             ->select(
+    //                 DB::raw('SUM(visit_infos.profit) as total_profit'),
+    //                 DB::raw('COUNT(DISTINCT visits.id) as visit_count'),
+    //                 // Используем CASE WHEN вместо GREATEST для совместимости с SQLite
+    //                 DB::raw("SUM(
+    //                     CASE 
+    //                         WHEN ((visit_infos.loaded - visit_infos.left) * products.price - visit_infos.profit) > 0 
+    //                         THEN ((visit_infos.loaded - visit_infos.left) * products.price - visit_infos.profit) 
+    //                         ELSE 0 
+    //                     END
+    //                 ) as total_minus")
+    //             )
+    //             ->first();
+
+    //         return [
+    //             'id' => $market->id,
+    //             'name' => $market->name,
+    //             // 'address' => $market->address ?? 'Manzil ko\'rsatilmagan',
+    //             'profit' => (int)($stats->total_profit ?? 0),
+    //             'minus' => (int)($stats->total_minus ?? 0),
+    //             'visit_count' => (int)($stats->visit_count ?? 0),
+    //         ];
+    //     });
+
+    //     return response()->json($markets);
+    // }
+
     public function marketsStatistics()
     {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        $markets = Market::all()->map(function ($market) use ($thirtyDaysAgo) {
-            $stats = DB::table('visit_infos')
-                ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-                ->join('products', 'visit_infos.product_id', '=', 'products.id')
-                ->where('visits.market_id', $market->id)
-                ->where('visits.created_at', '>=', $thirtyDaysAgo)
-                ->select(
-                    DB::raw('SUM(visit_infos.profit) as total_profit'),
-                    DB::raw('COUNT(DISTINCT visits.id) as visit_count'),
-                    // Используем CASE WHEN вместо GREATEST для совместимости с SQLite
-                    DB::raw("SUM(
-                        CASE 
-                            WHEN ((visit_infos.loaded - visit_infos.left) * products.price - visit_infos.profit) > 0 
-                            THEN ((visit_infos.loaded - visit_infos.left) * products.price - visit_infos.profit) 
-                            ELSE 0 
-                        END
-                    ) as total_minus")
-                )
-                ->first();
+        // 1. Делаем один запрос ко всем данным, сгруппировав их по market_id
+        $statsData = DB::table('visit_infos')
+            ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+            ->join('products', 'visit_infos.product_id', '=', 'products.id')
+            ->where('visits.created_at', '>=', $thirtyDaysAgo)
+            ->select(
+                'visits.market_id',
+                DB::raw('SUM(visit_infos.profit) as total_profit'),
+                DB::raw('COUNT(DISTINCT visits.id) as visit_count'),
+                // Используем новое поле sold и CASE для расчета долга
+                DB::raw("SUM(
+                    CASE 
+                        WHEN (visit_infos.sold * products.price - visit_infos.profit) > 0 
+                        THEN (visit_infos.sold * products.price - visit_infos.profit) 
+                        ELSE 0 
+                    END
+                ) as total_minus")
+            )
+            ->groupBy('visits.market_id')
+            ->get()
+            ->keyBy('market_id'); // Ключуем по ID маркета для быстрого доступа
+
+        // 2. Получаем все маркеты и «подмешиваем» к ним статистику
+        $markets = Market::all()->map(function ($market) use ($statsData) {
+            $stats = $statsData->get($market->id);
 
             return [
-                'id' => $market->id,
-                'name' => $market->name,
-                // 'address' => $market->address ?? 'Manzil ko\'rsatilmagan',
-                'profit' => (int)($stats->total_profit ?? 0),
-                'minus' => (int)($stats->total_minus ?? 0),
+                'id'          => $market->id,
+                'name'        => $market->name,
+                'profit'      => (int)($stats->total_profit ?? 0),
+                'minus'       => (int)($stats->total_minus ?? 0),
                 'visit_count' => (int)($stats->visit_count ?? 0),
             ];
         });
@@ -80,36 +122,78 @@ class StatController extends Controller
         return response()->json($markets);
     }
 
+    // public function agentsStatistics(Request $request)
+    // {
+    //     $thirtyDaysAgo = Carbon::now()->subDays(30);
+
+    //     // Получаем агентов с их визитами за 30 дней
+    //     $agents = User::where('role', 'agent')->get()->map(function ($user) use ($thirtyDaysAgo) {
+    //         $visitInfos = DB::table('visit_infos')
+    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+    //             ->where('visits.user_id', $user->id)
+    //             ->where('visits.created_at', '>=', $thirtyDaysAgo)
+    //             ->select('visit_infos.*', 'visits.created_at')
+    //             ->get();
+
+    //         $totalProfit = $visitInfos->sum('profit');
+            
+    //         // Расчет минуса
+    //         $totalMinus = 0;
+    //         foreach ($visitInfos as $info) {
+    //             $product = DB::table('products')->where('id', $info->product_id)->first();
+    //             $expected = ($info->loaded - $info->left) * ($product->price ?? 0);
+    //             $minus = max(0, $expected - $info->profit);
+    //             $totalMinus += $minus;
+    //         }
+
+    //         return [
+    //             'id' => $user->id,
+    //             'name' => $user->name,
+    //             'profit' => (int)$totalProfit,
+    //             'minus' => (int)$totalMinus,
+    //             'visit_count' => $visitInfos->unique('visit_id')->count(),
+    //         ];
+    //     });
+
+    //     return response()->json($agents);
+    // }
+
     public function agentsStatistics(Request $request)
     {
         $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        // Получаем агентов с их визитами за 30 дней
-        $agents = User::where('role', 'agent')->get()->map(function ($user) use ($thirtyDaysAgo) {
-            $visitInfos = DB::table('visit_infos')
-                ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-                ->where('visits.user_id', $user->id)
-                ->where('visits.created_at', '>=', $thirtyDaysAgo)
-                ->select('visit_infos.*', 'visits.created_at')
-                ->get();
+        // 1. Собираем статистику по всем агентам одним запросом
+        $statsData = DB::table('visit_infos')
+            ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+            ->join('products', 'visit_infos.product_id', '=', 'products.id')
+            ->where('visits.created_at', '>=', $thirtyDaysAgo)
+            ->select(
+                'visits.user_id',
+                DB::raw('SUM(visit_infos.profit) as total_profit'),
+                DB::raw('COUNT(DISTINCT visits.id) as visit_count'),
+                // Считаем минус, используя готовое поле sold
+                DB::raw("SUM(
+                    CASE 
+                        WHEN (visit_infos.sold * products.price - visit_infos.profit) > 0 
+                        THEN (visit_infos.sold * products.price - visit_infos.profit) 
+                        ELSE 0 
+                    END
+                ) as total_minus")
+            )
+            ->groupBy('visits.user_id')
+            ->get()
+            ->keyBy('user_id');
 
-            $totalProfit = $visitInfos->sum('profit');
-            
-            // Расчет минуса
-            $totalMinus = 0;
-            foreach ($visitInfos as $info) {
-                $product = DB::table('products')->where('id', $info->product_id)->first();
-                $expected = ($info->loaded - $info->left) * ($product->price ?? 0);
-                $minus = max(0, $expected - $info->profit);
-                $totalMinus += $minus;
-            }
+        // 2. Берем список агентов и приклеиваем статистику
+        $agents = User::where('role', 'agent')->get()->map(function ($user) use ($statsData) {
+            $stats = $statsData->get($user->id);
 
             return [
-                'id' => $user->id,
-                'name' => $user->name,
-                'profit' => (int)$totalProfit,
-                'minus' => (int)$totalMinus,
-                'visit_count' => $visitInfos->unique('visit_id')->count(),
+                'id'          => $user->id,
+                'name'        => $user->name,
+                'profit'      => (int)($stats->total_profit ?? 0),
+                'minus'       => (int)($stats->total_minus ?? 0),
+                'visit_count' => (int)($stats->visit_count ?? 0),
             ];
         });
 
