@@ -13,6 +13,7 @@ use App\Models\Group;
 use App\Models\Market;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -301,7 +302,7 @@ class VisitController extends Controller
     public function store(StoreVisitRequest $request)
     {
         return DB::transaction(function () use ($request) {
-            
+            try{
             $visit = Visit::create([
                 'user_id'   => Auth::id(), 
                 'market_id' => $request->market_id,
@@ -354,12 +355,20 @@ class VisitController extends Controller
                     ]);
                 }
             }
-
+            } catch(\Exception $e) {
+        // Записываем ошибку в storage/logs/laravel.log
+        Log::error('Visit Store Error: ' . $e->getMessage(), [
+            'user_id' => Auth::id(),
+            'payload' => $request->all(),
+            'trace'   => $e->getTraceAsString()
+        ]);
+            }
             return response()->json([
                 'message' => 'Muvaffaqiyatli saqlandi!', 
                 'visit' => $visit->load('infos')
             ], 201);
         });
+    
     }
 
     /**

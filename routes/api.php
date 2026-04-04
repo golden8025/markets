@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Route;
     
 
 
-Route::post('/login', [AuthController::class, 'login'])->name('login');;
+Route::post('/login', [AuthController::class, 'login'])->name('/login');;
 
 // --- Protected Routes (Any Authenticated User) ---
 Route::middleware('auth:sanctum')->group(function () {
