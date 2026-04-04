@@ -34,7 +34,7 @@ class StoreVisitRequest extends FormRequest
 
             // Валидация изображений
             'images'   => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:8120', // макс 5МБ
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:8120',
         ];
     }
 
