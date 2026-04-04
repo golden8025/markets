@@ -18,7 +18,10 @@ class CheckRole
     public function handle(Request $request, Closure $next, string $role): Response
     {
         if(!$request->user() || $request->user()->role !== $role){
-            return $this->ok('Sizda bunga xuquq yoq!');
+            // return $this->ok('Sizda bunga xuquq yoq!');
+            return response()->json([
+                'message' => 'Sizda bunga xuquq yoq!'
+            ], 403);
         }
         return $next($request);
     }
