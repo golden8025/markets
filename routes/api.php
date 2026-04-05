@@ -32,7 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/markets', [UsersController::class, 'group_markets']);
 
     // Visits & Products
-    Route::get('/visits/filters', [VisitController::class, 'getFilterData']);
+    Route::get('/visits-filters', [VisitController::class, 'getFilterData']);
     Route::get('/visits/edit/{id}', [VisitController::class, 'edit']);
     Route::get('/visits', [VisitController::class, 'index']);
     Route::put('/visits/update/{id}', [VisitController::class, 'update']);
