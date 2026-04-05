@@ -42,33 +42,33 @@ class DetailsController extends Controller
 
     //     return response()->json(['message' => 'Zaxira yangilandi']);
     // }
-//     public function updateStocks(Request $request, $marketId)
-// {
-//     $items = $request->input('stocks'); // [{product_id: 1, qty: 0}, {product_id: 2, qty: 10}]
+    public function updateStocks(Request $request, $marketId)
+    {
+        $items = $request->input('stocks'); // [{product_id: 1, qty: 0}, {product_id: 2, qty: 10}]
 
-//     DB::transaction(function () use ($items, $marketId) {
-//         foreach ($items as $item) {
-//             $productId = $item['product_id'];
-//             $qty = (int)$item['qty'];
+        DB::transaction(function () use ($items, $marketId) {
+            foreach ($items as $item) {
+                $productId = $item['product_id'];
+                $qty = (int)$item['qty'];
 
-//             if ($qty <= 0) {
-//                 // Если количество 0 или меньше — удаляем связь
-//                 DB::table('product_stocks')
-//                     ->where('market_id', $marketId)
-//                     ->where('product_id', $productId)
-//                     ->delete();
-//             } else {
-//                 // Если больше 0 — обновляем или создаем
-//                 DB::table('product_stocks')->updateOrInsert(
-//                     ['market_id' => $marketId, 'product_id' => $productId],
-//                     ['qty' => $qty, 'updated_at' => now()]
-//                 );
-//             }
-//         }
-//     });
+                if ($qty <= 0) {
+                    // Если количество 0 или меньше — удаляем связь
+                    DB::table('product_stocks')
+                        ->where('market_id', $marketId)
+                        ->where('product_id', $productId)
+                        ->delete();
+                } else {
+                    // Если больше 0 — обновляем или создаем
+                    DB::table('product_stocks')->updateOrInsert(
+                        ['market_id' => $marketId, 'product_id' => $productId],
+                        ['qty' => $qty, 'updated_at' => now()]
+                    );
+                }
+            }
+        });
 
-//     return response()->json(['message' => 'Zaxira yangilandi']);
-// }
+        return response()->json(['message' => 'Zaxira yangilandi']);
+    }
 
 //     public function details(string $id)
 // {
