@@ -237,7 +237,15 @@ class DetailsController extends Controller
                 // Сумма всех (продано * цена - профит), где это значение > 0
                 DB::raw('SUM(GREATEST(0, (visit_infos.sold * products.price) - visit_infos.profit)) as total_minus'),
                 // Количество товаров, по которым есть долг
-                DB::raw('COUNT(CASE WHEN (visit_infos.sold * products.price) > visit_infos.profit THEN 1 END) as debt_products_count')
+                //DB::raw('SUM(GREATEST (visit_infos.sold * products.price) > visit_infos.profit THEN 1 END) as debt_products_count')
+                DB::raw("SUM(
+                        CASE 
+                            WHEN (visit_infos.sold * products.price) > visit_infos.profit 
+                            THEN ((visit_infos.sold * products.price) - visit_infos.profit) / NULLIF(products.price, 0)
+                            ELSE 0 
+                        END
+                    ) as debt_products_count")
+            
             )->first();
 
         // 2. Данные для графика (Последние 7 дней)
@@ -272,6 +280,7 @@ class DetailsController extends Controller
             'market' => [
                 'id' => $market->id,
                 'name' => $market->name,
+                'key'  => $market->key,
                 'group_name' => $market->group?->name,
                 'type_label' => ucfirst($market->type),
                 'latitude' => $market->latitude,
