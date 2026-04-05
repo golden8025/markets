@@ -32,13 +32,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/markets', [UsersController::class, 'group_markets']);
 
     // Visits & Products
+    Route::get('/visits/filters', [VisitController::class, 'getFilterData']);
     Route::get('/visits/edit/{id}', [VisitController::class, 'edit']);
     Route::get('/visits', [VisitController::class, 'index']);
     Route::put('/visits/update/{id}', [VisitController::class, 'update']);
     Route::post('/visits', [VisitController::class, 'store']);
-    Route::get('/visits/{id}', [VisitController::class, 'show']);
-    Route::delete('/visits/{id}', [VisitController::class, 'destroy']);
-
+    Route::get('/visits/{id}', [VisitController::class, 'show'])->where('id', '[0-9]+');;
+    Route::delete('/visits/{id}', [VisitController::class, 'destroy'])->where('id', '[0-9]+');;
+    
 
 
     Route::get('/products/missing/{marketId}', [ProductController::class, 'getMissingProducts']);
@@ -57,7 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/agentstats', [StatController::class, 'agentsStatistics']);
         Route::get('/marketstats', [StatController::class, 'marketsStatistics']);
 
-        Route::get('/visits/filters', [VisitController::class, 'getFilterData']);
+        
         
 
 
