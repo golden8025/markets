@@ -12,32 +12,58 @@ class AuthController extends Controller
 {
     use ApiResponses;
 
-    public function login(LoginUserRequest $request){
+    // public function login(LoginUserRequest $request){
 
 
+    //     $validated = $request->validated();
+
+    //     if (!Auth::attempt($request->only('login', 'password'))){
+            
+    //         return $this->error('Login yoki parol xato!', 401);
+    //     }
+        
+    //     $user = User::where('login', $validated['login'])->first();
+
+    //     $tokenName = 'API Token for ' . $user->login;
+
+    //     $token = $user->createToken($tokenName, ['*'])->plainTextToken;
+
+    //     return response()->json([
+    //         'message' => 'Authenticated',
+    //         'token' => $token,
+    //         'role' => $user->role
+            
+    //     ], 200);
+        
+        
+        
+    // }
+    
+    public function login(LoginUserRequest $request)
+    {
         $validated = $request->validated();
 
-        if (!Auth::attempt($request->only('login', 'password'))){
-            
+        if (!Auth::attempt($request->only('login', 'password'))) {
             return $this->error('Login yoki parol xato!', 401);
         }
-        
+
         $user = User::where('login', $validated['login'])->first();
+
+        // 1. Удаляем все предыдущие токены этого пользователя перед созданием нового
+        $user->tokens()->delete();
 
         $tokenName = 'API Token for ' . $user->login;
 
-        $token = $user->createToken($tokenName, ['*'], now()->addMonths(5))->plainTextToken;
+        // 2. Создаем новый чистый токен
+        $token = $user->createToken($tokenName, ['*'])->plainTextToken;
 
         return response()->json([
             'message' => 'Authenticated',
             'token' => $token,
             'role' => $user->role
-            
         ], 200);
-        // return $this->success('Authenticated', ['token' => $token]);
-        
-        
     }
+
 
     public function logout(Request $request){
         $request -> user()->currentAccessToken()->delete();
