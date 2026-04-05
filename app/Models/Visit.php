@@ -29,6 +29,10 @@ class Visit extends Model
         return $this->hasMany(VisitInfo::class);
     }
 
+    public function info() {
+        return $this->hasMany(VisitInfo::class);
+    }
+
     public function market() {
         return $this->belongsTo(Market::class);
     }
