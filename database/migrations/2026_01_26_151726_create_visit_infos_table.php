@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('loaded');
             $table->integer('left');
             $table->integer('profit');
+            $table->integer('sold')->nullable();
             $table->timestamps();
         });
         
