@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'permission',
         'role',
+        'market_order'
     ];
 
     /**
@@ -42,10 +43,16 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+
+
+
     protected function casts(): array
     {
         return [
+
+            'market_order' => 'array',
             'permission',
+            // 'permission' => 'bool',
             'password' => 'hashed',
         ];
     }

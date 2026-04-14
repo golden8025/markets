@@ -84,29 +84,30 @@ class MarketController extends Controller
     }
 
 
-    // public function show(string $id)
-    // {
-    //     try{
-    //         $market = Market::where('id', $id)->with('products')->firstOrFail();            
-    //         return response()->json($market);
-    //     }
-    //     catch(ModelNotFoundException $ex){
-    //         return $this->error('Malumot topilmadi', 404);
-    //     }  
-        
-    // }
 
     public function show(string $id)
     {
         $market = Market::with('products')->find($id);
-
+        
         if (!$market) {
             return response()->json([
                 'message' => 'Topilmadi'
             ], 404);
         }
 
-        return response()->json($market);
+        $comment = $market->latestVisit?->comment;
+
+        return response()->json([
+            'id'        => $market->id,
+            'name'      => $market->name,
+            'key'       => $market->key,
+            'type'      => $market->type,
+            'latitude'  => $market->latitude,
+            'longitude' => $market->longitude,
+            'comment'   => $comment,
+            'products'  => $market->products,
+            
+        ]);
     }
 
     public function details(string $id)
@@ -117,6 +118,8 @@ class MarketController extends Controller
             ->with('infos')
             ->orderBy('visit_date', 'desc')
             ->first();
+
+
 
         $lastStats = [
             'profit' => 0,
@@ -153,77 +156,6 @@ class MarketController extends Controller
         ]);
     }
 
-    // public function dashboard()
-    // {
-    //     $today = now()->startOfDay();
-    //     $startOfMonth = now()->startOfMonth();
-    //     $startOfLastMonth = now()->subMonth()->startOfMonth();
-    //     $endOfLastMonth = now()->subMonth()->endOfMonth();
-
-    //     // 1. Статистика за сегодня + расчет "минуса" (недосдачи) за сегодня
-    //     $todayStats = DB::table('visit_infos')
-    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //         ->join('products', 'visit_infos.product_id', '=', 'products.id')
-    //         ->whereDate('visits.created_at', $today)
-    //         ->select(
-    //             DB::raw('SUM(visit_infos.profit) as total_profit'),
-    //             DB::raw('SUM(visit_infos.loaded) as total_loaded'),
-    //             DB::raw('SUM(visit_infos.loaded - visit_infos.left) as total_sold'),
-    //             // Вычисляем минус сегодня: (проданное * цена) - прибыль. Если результат < 0, то 0.
-    //             DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as today_minus')
-    //         )->first();
-
-    //     // 2. Общий "минус" за все время (теперь через SQL, а не в памяти PHP)
-    //     $totalMinus = DB::table('visit_infos')
-    //         ->join('products', 'visit_infos.product_id', '=', 'products.id')
-    //         ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
-    //         ->value('total') ?? 0;
-
-    //     // 3. Сравнение продаж (Текущий месяц vs Прошлый)
-    //     $thisMonthSold = DB::table('visit_infos')
-    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //         ->whereBetween('visits.created_at', [$startOfMonth, now()])
-    //         ->sum(DB::raw('loaded - `left`'));
-
-    //     $lastMonthSold = DB::table('visit_infos')
-    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //         ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
-    //         ->sum(DB::raw('loaded - `left`'));
-
-    //     // 4. Сравнение "минуса" (последние 30 дней vs предыдущие 30 дней)
-    //     $calculateMinusSql = function ($startDate, $endDate) {
-    //         return DB::table('visit_infos')
-    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //             ->join('products', 'visit_infos.product_id', '=', 'products.id')
-    //             ->whereBetween('visits.created_at', [$startDate, $endDate])
-    //             ->select(DB::raw('SUM(GREATEST(0, ((visit_infos.loaded - visit_infos.left) * products.price) - visit_infos.profit)) as total'))
-    //             ->value('total') ?? 0;
-    //     };
-
-    //     $now = now();
-    //     $thirtyDaysAgo = now()->subDays(30);
-    //     $sixtyDaysAgo = now()->subDays(60);
-
-    //     $currentMonthMinus = $calculateMinusSql($thirtyDaysAgo, $now);
-    //     $lastMonthMinus = $calculateMinusSql($sixtyDaysAgo, $thirtyDaysAgo);
-
-    //     $diffMinus = $currentMonthMinus - $lastMonthMinus;
-    //     $diffSold = $thisMonthSold - $lastMonthSold;
-
-    //     return response()->json([
-    //         'today_profit'      => round(($todayStats->total_profit ?? 0) / 1000000, 2),
-    //         'sale_points'       => DB::table('markets')->count(), // Быстрее чем Market::count()
-    //         'loaded_products'   => (int)($todayStats->total_loaded ?? 0),
-    //         'sold_products'     => (int)($todayStats->total_sold ?? 0),
-    //         'today_minus'       => number_format($todayStats->today_minus ?? 0, 0, '.', ' '),
-    //         'total_minus'       => number_format($totalMinus, 0, '.', ' '),
-            
-    //         'diff_products'     => ($diffSold >= 0 ? '+' : '') . $diffSold, 
-    //         'diff_minus'        => ($diffMinus >= 0 ? '+' : '') . number_format($diffMinus, 0, '.', ' '),
-    //         'diff_profit'       => "+0.5", // Статика для визуала
-    //     ]);
-    // }
-
     public function dashboard()
     {
         $today = now()->startOfDay();
@@ -231,11 +163,14 @@ class MarketController extends Controller
         $startOfLastMonth = now()->subMonth()->startOfMonth();
         $endOfLastMonth = now()->subMonth()->endOfMonth();
 
+        $tenDaysAgo = now()->subDays(10)->startOfDay(); 
+
         // 1. Статистика за сегодня + расчет "минуса" через новое поле sold
         $todayStats = DB::table('visit_infos')
             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
             ->join('products', 'visit_infos.product_id', '=', 'products.id')
-            ->whereDate('visits.created_at', $today)
+            // ->whereDate('visits.created_at', $today)
+            ->whereBetween('visits.created_at', [$tenDaysAgo, now()])
             ->select(
                 DB::raw('SUM(visit_infos.profit) as total_profit'),
                 DB::raw('SUM(visit_infos.loaded) as total_loaded'),
@@ -295,221 +230,59 @@ class MarketController extends Controller
         ]);
     }
    
-    // public function dashboard()
-    // {
-    //     $today = Carbon::today();
-    //     $startOfMonth = Carbon::now()->startOfMonth();
-    //     $startOfLastMonth = Carbon::now()->subMonth()->startOfMonth();
-    //     $endOfLastMonth = Carbon::now()->subMonth()->endOfMonth();
-
-    //     $todayStats = DB::table('visit_infos')
-    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //         ->whereDate('visits.created_at', $today)
-    //         ->select(
-    //             DB::raw('SUM(profit) as total_profit'),
-    //             DB::raw('SUM(loaded) as total_loaded'),
-    //             DB::raw('SUM(`loaded` - `left`) as total_sold')
-    //         )->first();
-
-
-    //     $allVisitsInfo = VisitInfo::with('product')->get();
-    //     $totalMinus = $allVisitsInfo->sum(function ($info) {
-    //         $expected = ($info->loaded - $info->left) * ($info->product->price ?? 0);
-    //         return max(0, $expected - $info->profit);
-    //     });
-
-    //     // 3. Сравнение периодов (Текущий месяц vs Прошлый)
-    //     $thisMonthSold = DB::table('visit_infos')
-    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //         ->whereBetween('visits.created_at', [$startOfMonth, Carbon::now()])
-    //         ->sum(DB::raw('`loaded` - `left`'));
-
-    //     $lastMonthSold = DB::table('visit_infos')
-    //         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //         ->whereBetween('visits.created_at', [$startOfLastMonth, $endOfLastMonth])
-    //         ->sum(DB::raw('`loaded` - `left`'));
-
-    //     // Расчет разницы в процентах или единицах
-    //     $diffSold = $thisMonthSold - $lastMonthSold;
-    //     $diffPrefix = $diffSold >= 0 ? '+' : '';
-
-    //     $now = Carbon::now();
-    //     $thirtyDaysAgo = Carbon::now()->subDays(30);
-    //     $sixtyDaysAgo = Carbon::now()->subDays(60);
-    //     $calculateMinus = function ($startDate, $endDate) {
-    //         $infos = VisitInfo::with('product')
-    //             ->whereHas('visit', function ($q) use ($startDate, $endDate) {
-    //                 $q->whereBetween('created_at', [$startDate, $endDate]);
-    //             })->get();
-
-    //         return $infos->sum(function ($info) {
-    //             $sold = $info->loaded - $info->left;
-    //             $expected = $sold * ($info->product->price ?? 0);
-    //             return max(0, $expected - $info->profit);
-    //         });
-    //     };
-    //     $currentMonthMinus = $calculateMinus($thirtyDaysAgo, $now);
-    //     $lastMonthMinus = $calculateMinus($sixtyDaysAgo, $thirtyDaysAgo);
-
-    //     // 3. Вычисляем разницу
-    //     $diff = $currentMonthMinus - $lastMonthMinus;
-
-    //     if ($diff > 0) {
-    //         $diffMinusString = "+" . number_format($diff, 0, '.', ' ');
-    //     } elseif ($diff < 0) {
-    //         $diffMinusString = number_format($diff, 0, '.', ' '); 
-    //     } else {
-    //         $diffMinusString = "0";
-    //     }
-    //     return response()->json([
-    //         'today_profit'    => round(($todayStats->total_profit ?? 0) / 1000000, 2), // В миллионах для экрана
-    //         'sale_points'     => Market::count(),
-    //         'loaded_products' => (int)($todayStats->total_loaded ?? 0),
-    //         'sold_products'   => (int)($todayStats->total_sold ?? 0),
-    //         'minus'           => number_format($totalMinus, 0, '.', ' '),
-            
-    //         // Данные для блока сравнения
-    //         'diff_products'   => $diffPrefix . $diffSold, 
-    //         'diff_minus'      => $diffMinusString, // Можно усложнить логику позже
-    //         'diff_profit'     => $diffPrefix . "0.5", // Пример статики для визуала
-    //     ]);
-    // }
-
-    // App/Http/Controllers/Api/StatisticsController.php
-    
-    // public function statistics() {
-    //     $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha']; // Порядок зависит от настроек недели
-    //     $weeklyData = [];
-
-    //     // Собираем данные за последние 7 дней
-    //     for ($i = 6; $i >= 0; $i--) {
-    //         $date = Carbon::now()->subDays($i);
-    //         $dayName = $days[$date->dayOfWeek];
-
-    //         $stats = DB::table('visit_infos')
-    //             ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-    //             ->whereDate('visits.created_at', $date)
-    //             ->select(
-    //                 DB::raw('SUM(`loaded` - `left`) as sales'),
-    //                 DB::raw('SUM(profit) as income')
-    //             )->first();
-
-    //         $weeklyData[] = [
-    //             'day' => $dayName,
-    //             'sales' => (int)($stats->sales ?? 0),
-    //             'income' => (int)($stats->income ?? 0),
-    //         ];
-    //     }
-
-    //     $totalVisits = Visit::where('created_at', '>=', Carbon::now()->subDays(7))->count();
-    //     $totalIncome = collect($weeklyData)->sum('income');
-    //     $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
-
-    //     return response()->json([
-    //         'weekly_data' => $weeklyData,
-    //         'total_visits' => $totalVisits,
-    //         'avg_income' => (int)(round($avgIncome, 2))
-    //     ]);
-    // }
 
     public function statistics() 
-{
-    $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha'];
-    $startDate = Carbon::now()->subDays(6)->startOfDay();
-    
-    // 1. Получаем все данные за неделю одним запросом
-    $rawStats = DB::table('visit_infos')
-        ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-        ->where('visits.created_at', '>=', $startDate)
-        ->select(
-            DB::raw('DATE(visits.created_at) as date'),
-            // ТЕПЕРЬ ИСПОЛЬЗУЕМ ПОЛЕ sold
-            DB::raw('SUM(visit_infos.sold) as total_sales'),
-            DB::raw('SUM(visit_infos.profit) as total_income'),
-            DB::raw('COUNT(DISTINCT visits.id) as visits_count')
-        )
-        ->groupBy('date')
-        ->get()
-        ->keyBy('date');
+    {
+        $days = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha'];
+        $startDate = Carbon::now()->subDays(6)->startOfDay();
+        
+        // 1. Получаем все данные за неделю одним запросом
+        $rawStats = DB::table('visit_infos')
+            ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
+            ->where('visits.created_at', '>=', $startDate)
+            ->select(
+                DB::raw('DATE(visits.created_at) as date'),
+                // ТЕПЕРЬ ИСПОЛЬЗУЕМ ПОЛЕ sold
+                DB::raw('SUM(visit_infos.sold) as total_sales'),
+                DB::raw('SUM(visit_infos.profit) as total_income'),
+                DB::raw('COUNT(DISTINCT visits.id) as visits_count')
+            )
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
 
-    $weeklyData = [];
-    $totalVisitsCount = 0;
+        $weeklyData = [];
+        $totalVisitsCount = 0;
 
-    // 2. Формируем массив для фронтенда, заполняя пустые дни нулями
-    for ($i = 6; $i >= 0; $i--) {
-        $dateObj = Carbon::now()->subDays($i);
-        $dateString = $dateObj->format('Y-m-d');
-        $dayName = $days[$dateObj->dayOfWeek];
+        // 2. Формируем массив для фронтенда, заполняя пустые дни нулями
+        for ($i = 6; $i >= 0; $i--) {
+            $dateObj = Carbon::now()->subDays($i);
+            $dateString = $dateObj->format('Y-m-d');
+            $dayName = $days[$dateObj->dayOfWeek];
 
-        $dayData = $rawStats->get($dateString);
+            $dayData = $rawStats->get($dateString);
 
-        $weeklyData[] = [
-            'day'    => $dayName,
-            'sales'  => (int)($dayData->total_sales ?? 0),  // Кол-во проданного товара
-            'income' => (int)($dayData->total_income ?? 0), // Полученные деньги
-        ];
+            $weeklyData[] = [
+                'day'    => $dayName,
+                'sales'  => (int)($dayData->total_sales ?? 0),  // Кол-во проданного товара
+                'income' => (int)($dayData->total_income ?? 0), // Полученные деньги
+            ];
 
-        $totalVisitsCount += ($dayData->visits_count ?? 0);
+            $totalVisitsCount += ($dayData->visits_count ?? 0);
+        }
+
+        $totalIncome = collect($weeklyData)->sum('income');
+        
+        // Средний доход на один визит
+        $avgIncome = $totalVisitsCount > 0 ? $totalIncome / $totalVisitsCount : 0;
+
+        return response()->json([
+            'weekly_data'  => $weeklyData,
+            'total_visits' => $totalVisitsCount,
+            'avg_income'   => (int)round($avgIncome),
+        ]);
     }
 
-    $totalIncome = collect($weeklyData)->sum('income');
-    
-    // Средний доход на один визит
-    $avgIncome = $totalVisitsCount > 0 ? $totalIncome / $totalVisitsCount : 0;
-
-    return response()->json([
-        'weekly_data'  => $weeklyData,
-        'total_visits' => $totalVisitsCount,
-        'avg_income'   => (int)round($avgIncome),
-    ]);
-}
-
-//     public function statistics() {
-//     $daysNames = ['Yak', 'Du', 'Se', 'Chor', 'Pa', 'Ju', 'Sha'];
-//     $startDate = now()->subDays(6)->startOfDay();
-    
-//     // Один запрос для получения всех данных за неделю
-//     $statsData = DB::table('visit_infos')
-//         ->join('visits', 'visit_infos.visit_id', '=', 'visits.id')
-//         ->where('visits.created_at', '>=', $startDate)
-//         ->select(
-//             DB::raw('DATE(visits.created_at) as date'),
-//             DB::raw('SUM(`loaded` - `left`) as sales'),
-//             DB::raw('SUM(profit) as income')
-//         )
-//         ->groupBy('date')
-//         ->get()
-//         ->keyBy('date'); // Группируем по дате для удобного поиска
-
-//     $weeklyData = [];
-//     $totalIncome = 0;
-
-//     // Формируем массив, гарантируя наличие всех 7 дней (даже если продаж не было)
-//     for ($i = 6; $i >= 0; $i--) {
-//         $dateObj = now()->subDays($i);
-//         $dateString = $dateObj->toDateString();
-        
-//         $dayStats = $statsData->get($dateString);
-        
-//         $income = (int)($dayStats->income ?? 0);
-//         $totalIncome += $income;
-
-//         $weeklyData[] = [
-//             'day' => $daysNames[$dateObj->dayOfWeek],
-//             'sales' => (int)($dayStats->sales ?? 0),
-//             'income' => $income,
-//         ];
-//     }
-
-//     $totalVisits = Visit::where('created_at', '>=', $startDate)->count();
-//     $avgIncome = $totalVisits > 0 ? $totalIncome / $totalVisits : 0;
-
-//     return response()->json([
-//         'weekly_data' => $weeklyData,
-//         'total_visits' => $totalVisits,
-//         'avg_income' => round($avgIncome, 2)
-//     ]);
-// }
    
     public function update(Request $request, string $id)
     {
@@ -524,16 +297,16 @@ class MarketController extends Controller
                     'required', 
                     Rule::in(['metan', 'propan', 'dokon'])
                 ],
-                'key' => 'sometimes|required|string|max:255',
-                'latitude' => 'sometimes|required|numeric',
-                'longitude' => 'sometimes|required|numeric',
+                'key' => 'nullable|string|max:255',
+                'latitude' => 'nullable|numeric',
+                'longitude' => 'nullable|numeric',
             ]);
 
             $market->update($validated);
 
             return response()->json([
                 'message' => 'Malumotlar yangilandi',
-                'data' => $request->all()
+                
             ]);
         }
         catch(Exception $ex){

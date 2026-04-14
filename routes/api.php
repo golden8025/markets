@@ -26,10 +26,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/markets/{id}', [MarketController::class, 'show']);
     Route::get('/allmarkets', [MarketController::class, 'all_markets']);
     Route::get('/markets/products/{id}', [MarketController::class, 'products']);
+    Route::put('/markets/update/{id}', [MarketController::class, 'update']);
+    
     
     // Groups & Users (General)
     Route::get('/groups', [GroupController::class, 'index']);
     Route::get('/users/markets', [UsersController::class, 'group_markets']);
+    Route::post('/users/order-markets', [UsersController::class, 'saveMarketOrder']);
 
     // Visits & Products
     Route::get('/filters', [VisitController::class, 'getFilterData']);
@@ -55,6 +58,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Analytics
         Route::get('/dashboard', [MarketController::class, 'dashboard']);
         Route::get('/statistics', [MarketController::class, 'statistics']);
+        Route::delete('/markets/{id}', [MarketController::class, 'destroy']);
+
+
         Route::get('/agentstats', [StatController::class, 'agentsStatistics']);
         Route::get('/marketstats', [StatController::class, 'marketsStatistics']);
 
@@ -72,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/groups/update/{id}', [GroupController::class, 'updateGroup']);
         Route::get('/groups/markets', [GroupController::class, 'getGroups']);
         Route::post('/groups', [GroupController::class, 'store']);
+        Route::delete('/groups/{id}', [GroupController::class, 'destroy']);
+        Route::put('/groups/{id}', [GroupController::class, 'update']);
+        
 
         Route::get('/users/{id}/markets', [UsersController::class, 'markets']);
         Route::post('/users/{id}/sync-markets', [UsersController::class, 'syncMarkets']);

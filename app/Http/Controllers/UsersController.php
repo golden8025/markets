@@ -12,6 +12,7 @@ use App\Http\Requests\UpdateUserRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class UsersController extends Controller
@@ -23,6 +24,50 @@ class UsersController extends Controller
         return response()->json(User::where('role', 'agent')->get());
     }
 
+    // public function saveMarketOrder(Request $request)
+    // {
+    //     $request->validate([
+    //         'order' => 'required|array',
+    //         'order.*' => 'integer',
+    //     ]);
+
+    //     Auth::user()->update(['market_order' => $request->order]);
+    //     // $user = Auth::user();        
+    //     // $savedOrder = $user->market_order ?? [];
+    //     // $tip = gettype($savedOrder);
+    //     // Log::info('Saved order for user ' . $user->id . ': ', $savedOrder . 'type ' . $tip);
+    //     return response()->json(['message' => 'Saqlandi']);
+        
+    // }
+
+    public function saveMarketOrder(Request $request)
+    {
+        $request->validate([
+            'order' => 'required|array',
+            'order.*' => 'integer',
+        ]);
+
+        $user = Auth::user();
+        $newOrder = array_map('intval', $request->order);
+        
+        // Получаем текущий порядок (уже будет массивом благодаря касту в модели)
+        $currentOrder = $user->market_order ?? [];
+
+        // 1. Убираем из старого списка те ID, которые пришли сейчас (чтобы переместить их)
+        $remainingOrder = array_diff($currentOrder, $newOrder);
+
+        // 2. Сливаем: новые ID + оставшиеся старые
+        // Таким образом, те, что мы только что отсортировали, будут в приоритете,
+        // а остальные маркеты просто останутся в списке дальше.
+        $finalOrder = array_values(array_merge($newOrder, $remainingOrder));
+
+        $user->update(['market_order' => $finalOrder]);
+
+        return response()->json([
+            'message' => 'Poryadok saqlandi',
+            'debug_saved' => $finalOrder // Для проверки во Flutter
+        ]);
+    }
 
     public function store(StoreUserRequest $request)
     {
@@ -276,7 +321,7 @@ class UsersController extends Controller
     public function group_markets2()
     {
         $user = Auth::user();
-
+        $savedOrder = $user->market_order ?? [];
         $groups = Group::query()
             ->whereHas('markets', function ($q) use ($user) {
                 $q->when($user->role === 'agent', function ($sq) use ($user) {
@@ -295,7 +340,25 @@ class UsersController extends Controller
             }])
             ->get();
 
-        $groups->each(function ($group) {
+        $groups->each(function ($group) use ($savedOrder) {
+            // if (!empty($savedOrder)) {
+            //     $group->markets = $group->markets->sortBy(function ($market) use ($savedOrder) {
+            //         $index = array_search($market->id, $savedOrder);
+            //         return $index === false ? PHP_INT_MAX : $index;
+            //     })->values();
+            // }
+            if (!empty($savedOrder)) {
+                // Приводим все ID в массиве к int на всякий случай
+                $orderIds = array_map('intval', $savedOrder);
+                
+                $sortedMarkets = $group->markets->sortBy(function ($market) use ($orderIds) {
+                    $index = array_search((int)$market->id, $orderIds);
+                    return $index === false ? PHP_INT_MAX : $index;
+                })->values();
+
+                // 2. ВАЖНО: Переустанавливаем связь для корректного JSON-ответа
+                $group->setRelation('markets', $sortedMarkets);
+            }
             foreach ($group->markets as $market) {
                 $lastVisit = $market->latestVisit;
 
@@ -325,15 +388,16 @@ class UsersController extends Controller
                         }
                         return 0;
                     });
-
+                    $market->visited = $lastVisit->created_at->gte(now()->subDays(3));
                 } else {
                     // Если визитов не было — всё по нулям
                     $market->last_profit = 0;
                     $market->last_debt = 0;
                     $market->last_sold_qty = 0;
                     $market->last_minus_qty = 0;
+                    $market->visited = false;
                 }
-
+                // $market->visited = true;
                 // Приведение типов для Flutter
                 $market->total_qty = (int) ($market->total_qty ?? 0);
                 

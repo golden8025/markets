@@ -276,6 +276,12 @@ class DetailsController extends Controller
                 ->select('products.name', 'product_stocks.qty', 'products.price')
                 ->get();
 
+        $lastComment = DB::table('visits')
+            ->where('market_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->value('comment');    
+            
+            
         return response()->json([
             'market' => [
                 'id' => $market->id,
@@ -285,6 +291,7 @@ class DetailsController extends Controller
                 'type_label' => ucfirst($market->type),
                 'latitude' => $market->latitude,
                 'longitude' => $market->longitude,
+                'comment' => $lastComment,
             ],
             'statistics' => [
                 'summary' => [

@@ -27,8 +27,8 @@ class StoreMarketRequest extends FormRequest
             'name'      => ['required', 'string', 'unique:markets,name', 'max:255'],
             'key'       => ['string'],
             'type'      => ['required', 'string', Rule::in(['metan', 'propan', 'dokon'])],
-            'latitude'  => ['required', 'numeric'],
-            'longitude' => ['required', 'numeric'],
+            'latitude'  => ['nullable', 'numeric'],
+            'longitude' => ['nullable', 'numeric'],
         ];
     }
 

@@ -40,9 +40,9 @@ class DatabaseSeeder extends Seeder
 
 
         // 3. Создаем продукты
-        $product1 = Product::create(['name' => 'Coca-cola 0.5', 'price' => 50.00]);
-        $product2 = Product::create(['name' => 'pepsi 0.5', 'price' => 45.00]);
-        $product3 = Product::create(['name' => 'Chips Lays', 'price' => 120.00]);
+        $product1 = Product::create(['name' => 'Coca-cola 0.5', 'price' => 5000]);
+        $product2 = Product::create(['name' => 'pepsi 0.5', 'price' => 4500]);
+        $product3 = Product::create(['name' => 'Chips Lays', 'price' => 12000]);
 
         // 4. Создаем маркеты
         $market1 = Market::create([
