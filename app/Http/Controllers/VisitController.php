@@ -504,6 +504,32 @@ class VisitController extends Controller
             ];
         });
 
+        $recentVisits = DB::table('visits')
+            ->join('visit_infos', 'visits.id', '=', 'visit_infos.visit_id')
+            ->join('products', 'visit_infos.product_id', '=', 'products.id')
+            ->where('visits.market_id', $visit->market_id)
+            ->where('visits.id', '!=', $id) // exclude current visit
+            ->select(
+                'visits.id',
+                'visits.created_at',
+                'visits.comment',
+                DB::raw('SUM(visit_infos.profit) as total_profit'),
+                DB::raw('SUM(visit_infos.sold) as total_sold'),
+                DB::raw('SUM(GREATEST(0, (visit_infos.sold * products.price) - visit_infos.profit)) as total_minus')
+            )
+            ->groupBy('visits.id', 'visits.created_at', 'visits.comment')
+            ->orderBy('visits.created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(fn($v) => [
+                'id'           => $v->id,
+                'date'         => \Carbon\Carbon::parse($v->created_at)->format('d.m.Y'),
+                'comment'      => $v->comment,
+                'total_profit' => (int)$v->total_profit,
+                'total_sold'   => (int)$v->total_sold,
+                'total_minus'  => (int)$v->total_minus,
+            ]);
+            
         return response()->json([
             'id'             => $visit->id,
             'market_name'    => $visit->market->name ?? 'N/A',
@@ -514,6 +540,7 @@ class VisitController extends Controller
             'total_sold'     => (int)$report->sum('sold'),
             'total_profit'   => (int)$report->sum('profit'),
             'total_minus'    => (int)$report->sum('minus'),
+            'recent_visits'  => $recentVisits,
         ]);
     }
 

@@ -7,6 +7,7 @@ use App\Models\Market;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreGroupRequest;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class GroupController extends Controller
@@ -99,5 +100,41 @@ class GroupController extends Controller
             'message' => 'Gurux yangilandi',
             'market' => $market
         ]);
+    }
+
+    public function groupStats()
+    {
+        $dateFrom = now()->subDays(29)->startOfDay();
+
+        $stats = DB::table('groups')
+            ->leftJoin('markets', 'groups.id', '=', 'markets.group_id')
+            ->leftJoin('visits', function ($join) use ($dateFrom) {
+                $join->on('markets.id', '=', 'visits.market_id')
+                    ->where('visits.created_at', '>=', $dateFrom);
+            })
+            ->leftJoin('visit_infos', 'visits.id', '=', 'visit_infos.visit_id')
+            ->leftJoin('products', 'visit_infos.product_id', '=', 'products.id')
+            ->groupBy('groups.id', 'groups.name')
+            ->select(
+                'groups.id',
+                'groups.name',
+                DB::raw('COUNT(DISTINCT markets.id) as market_count'),
+                DB::raw('COUNT(DISTINCT visits.id) as total_visits'),
+                DB::raw('COALESCE(SUM(visit_infos.sold), 0) as total_sold'),
+                DB::raw('COALESCE(SUM(visit_infos.profit), 0) as total_profit'),
+                DB::raw('COALESCE(SUM(GREATEST(0, (visit_infos.sold * products.price) - visit_infos.profit)), 0) as total_minus')
+            )
+            ->get()
+            ->map(fn($g) => [
+                'id'           => $g->id,
+                'name'         => $g->name,
+                'market_count' => (int)$g->market_count,
+                'total_visits' => (int)$g->total_visits,
+                'total_sold'   => (int)$g->total_sold,
+                'total_profit' => (int)$g->total_profit,
+                'total_minus'  => (int)$g->total_minus,
+            ]);
+
+        return response()->json(['groups' => $stats]);
     }
 }

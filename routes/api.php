@@ -31,6 +31,8 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Groups & Users (General)
     Route::get('/groups', [GroupController::class, 'index']);
+    Route::get('/groups/stats', [GroupController::class, 'groupStats']);
+
     Route::get('/users/markets', [UsersController::class, 'group_markets']);
     Route::post('/users/order-markets', [UsersController::class, 'saveMarketOrder']);
 
